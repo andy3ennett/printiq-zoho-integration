@@ -81,7 +81,7 @@ node tests/testAddressWebhook.js
 
 ## 📄 Documentation
 
-See [`PrintIQ_Zoho_PM_Brief.pdf`](./PrintIQ_Zoho_PM_Brief.pdf) for an overview of project goals, features, and next steps.
+To follow.
 
 ---
 
@@ -96,11 +96,10 @@ See [`PrintIQ_Zoho_PM_Brief.pdf`](./PrintIQ_Zoho_PM_Brief.pdf) for an overview o
 
 ## 👥 Maintainers
 
-- Original Developer: _[Your Name or Team]_  
-- Onboarding PM: See PDF brief for technical summary
+- Original Developer: Andy3ennett 
 
 ---
 
 ## 📬 Feedback & Issues
 
-Please raise issues or questions via GitHub Issues or [email@example.com].
+Please raise issues or questions via GitHub Issues
