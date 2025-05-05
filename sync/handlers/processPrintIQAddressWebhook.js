@@ -1,11 +1,11 @@
-const {
+import {
   findZohoAccountByPrintIQId,
   updateAccountAddressSubform,
-} = require('../helpers/zohoApi');
-const { getValidAccessToken } = require('../auth/tokenManager');
-const syncLogger = require('../../logs/syncLogger');
+} from '../helpers/zohoApi.js';
+import { getValidAccessToken } from '../auth/tokenManager.js';
+import syncLogger from '../../logs/syncLogger.js';
 
-async function processPrintIQAddressWebhook(data) {
+export async function processPrintIQAddressWebhook(data) {
   try {
     await getValidAccessToken();
 
@@ -33,7 +33,3 @@ async function processPrintIQAddressWebhook(data) {
     syncLogger.logError('❌ Failed to process address webhook:', err);
   }
 }
-
-module.exports = {
-  processPrintIQAddressWebhook,
-};

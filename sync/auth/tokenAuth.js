@@ -1,4 +1,4 @@
-function requireTokenAuth(req, res, next) {
+export function requireTokenAuth(req, res, next) {
   const expectedToken = process.env.HEALTH_TOKEN;
   const authHeader = req.headers.authorization;
 
@@ -17,7 +17,3 @@ function requireTokenAuth(req, res, next) {
 
   next();
 }
-
-module.exports = {
-  requireTokenAuth,
-};

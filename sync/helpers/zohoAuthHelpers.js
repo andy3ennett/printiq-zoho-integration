@@ -1,86 +1,112 @@
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
+import axios from 'axios';
+import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
-const TOKEN_PATH = path.resolve(__dirname, '../../token.json');
-const tokenUrl = `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/token`;
-console.log('🔍 Refresh URL:', tokenUrl);
+dotenv.config();
 
-function saveTokens(tokens) {
+const tokenData = JSON.parse(
+  fs.readFileSync(path.resolve('./token.json'), 'utf-8')
+);
+
+const headers = {
+  Authorization: `Zoho-oauthtoken ${tokenData.access_token}`,
+  'Content-Type': 'application/json',
+};
+
+export async function createOrUpdateZohoAccount(accountData) {
+  const payload = {
+    data: [accountData],
+    trigger: ['workflow'],
+  };
+
   try {
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
-    console.log(`💾 Token saved successfully to: ${TOKEN_PATH}`);
-  } catch (err) {
-    console.error(`❌ Failed to save token to ${TOKEN_PATH}:`, err.message);
-  }
-}
+    const criteria = `((Integration_ID:equals:${accountData.Integration_ID}) or (Customer_Code:equals:${accountData.Customer_Code}))`;
+    const searchUrl = `${process.env.ZOHO_API_BASE}/Accounts/search?criteria=${encodeURIComponent(
+      criteria
+    )}`;
+    const searchRes = await axios.get(searchUrl, { headers });
 
-function loadTokens() {
-  try {
-    if (fs.existsSync(TOKEN_PATH)) {
-      const data = fs.readFileSync(TOKEN_PATH, 'utf-8');
-      console.log(`📄 Token loaded from: ${TOKEN_PATH}`);
-      return JSON.parse(data);
+    if (
+      searchRes.data &&
+      searchRes.data.data &&
+      searchRes.data.data.length > 0
+    ) {
+      const existingId = searchRes.data.data[0].id;
+      const updateUrl = `${process.env.ZOHO_API_BASE}/Accounts/${existingId}`;
+      const updatePayload = { data: [{ ...accountData }] };
+      const updateRes = await axios.put(updateUrl, updatePayload, { headers });
+      return { status: 'updated', id: existingId, result: updateRes.data };
     } else {
-      console.warn(`⚠️ Token file not found at: ${TOKEN_PATH}`);
-      return null;
+      const createUrl = `${process.env.ZOHO_API_BASE}/Accounts`;
+      const createRes = await axios.post(createUrl, payload, { headers });
+      const newId = createRes.data.data[0].details.id;
+      return { status: 'created', id: newId, result: createRes.data };
     }
   } catch (err) {
-    console.error(`❌ Error reading token from ${TOKEN_PATH}:`, err.message);
-    return null;
-  }
-}
-
-async function refreshAccessToken() {
-  const tokens = loadTokens();
-  if (!tokens || !tokens.refresh_token) {
-    throw new Error('No refresh token available.');
-  }
-
-  console.log('🔄 Refreshing Zoho access token...');
-
-  try {
-    const response = await axios.post(
-      `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/token`,
-      null,
-      {
-        params: {
-          refresh_token: tokens.refresh_token,
-          client_id: process.env.ZOHO_CLIENT_ID,
-          client_secret: process.env.ZOHO_CLIENT_SECRET,
-          grant_type: 'refresh_token',
-        },
-      }
-    );
-
-    tokens.access_token = response.data.access_token;
-    tokens.expires_in = Date.now() + response.data.expires_in * 1000;
-
-    saveTokens(tokens);
-    console.log('✅ Access token refreshed!');
-    return tokens.access_token;
-  } catch (error) {
     console.error(
-      '❌ Failed to refresh access token:',
-      error.response?.data || error.message
+      'Zoho Account Sync Error:',
+      err.response?.data || err.message
     );
-    throw new Error('Failed to refresh access token');
+    throw new Error('Failed to create or update Zoho account');
   }
 }
 
-function getTokens() {
+export async function findAccountByCustomerId(customerId) {
   try {
-    const rawData = fs.readFileSync(TOKEN_PATH);
-    return JSON.parse(rawData);
-  } catch (error) {
-    console.error('❌ Failed to load tokens in getTokens:', error.message);
+    const criteria = `(PrintIQ_Customer_ID:equals:${customerId})`;
+    const searchUrl = `${process.env.ZOHO_API_BASE}/Accounts/search?criteria=${encodeURIComponent(
+      criteria
+    )}`;
+    const response = await axios.get(searchUrl, { headers });
+
+    if (
+      response.data &&
+      response.data.data &&
+      response.data.data.length > 0
+    ) {
+      return response.data.data[0];
+    }
+
     return null;
+  } catch (err) {
+    console.error(
+      'Error searching Zoho account by CustomerID:',
+      err.response?.data || err.message
+    );
+    throw new Error('Failed to search for Zoho account');
   }
 }
 
-module.exports = {
-  saveTokens,
-  loadTokens,
-  getTokens,
-  refreshAccessToken,
-};
+export async function updateAccountAddressSubform(accountId, address) {
+  const updateUrl = `${process.env.ZOHO_API_BASE}/Accounts/${accountId}`;
+  const subformEntry = {
+    Address_Line_1: address.AddressLine1,
+    Address_Line_2: address.AddressLine2 || '',
+    City: address.City,
+    State: address.State,
+    Post_Code: address.PostCode,
+    Country: address.Country,
+    PrintIQ_Address_Key: address.AddressKey.toString(),
+  };
+
+  const payload = {
+    data: [
+      {
+        id: accountId,
+        Address_Subform: [subformEntry],
+      },
+    ],
+  };
+
+  try {
+    const res = await axios.put(updateUrl, payload, { headers });
+    return res.data;
+  } catch (err) {
+    console.error(
+      'Error updating address subform in Zoho:',
+      err.response?.data || err.message
+    );
+    throw new Error('Failed to update address subform');
+  }
+}

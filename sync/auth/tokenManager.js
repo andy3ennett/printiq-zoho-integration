@@ -1,8 +1,16 @@
-const fs = require('fs');
-const axios = require('axios');
-require('dotenv').config();
+import fs from 'fs';
+import axios from 'axios';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import dotenv from 'dotenv';
 
-const TOKEN_FILE = './token.json';
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const TOKEN_FILE = path.resolve(__dirname, '../../token.json');
 let tokens = {};
 
 // Load tokens from disk if available
@@ -16,7 +24,7 @@ function saveTokens() {
 }
 
 // Refresh Zoho access token using refresh token
-async function refreshAccessToken() {
+export async function refreshAccessToken() {
   console.log('🔄 Refreshing Zoho access token...');
   try {
     const response = await axios.post(
@@ -47,7 +55,7 @@ async function refreshAccessToken() {
 }
 
 // Ensure token is valid; refresh if close to expiration
-async function getValidAccessToken() {
+export async function getValidAccessToken() {
   if (!tokens.access_token || !tokens.expires_in) {
     throw new Error(
       '❌ No valid access token found. Please authenticate via /auth.'
@@ -56,7 +64,6 @@ async function getValidAccessToken() {
 
   const msUntilExpiry = tokens.expires_in - Date.now();
   if (msUntilExpiry < 5 * 60 * 1000) {
-    // Less than 5 minutes
     await refreshAccessToken();
   }
 
@@ -64,7 +71,7 @@ async function getValidAccessToken() {
 }
 
 // Utility for testing token status
-async function tokenDoctor() {
+export async function tokenDoctor() {
   console.log('🩺 Running Token Doctor...');
 
   const token = await getValidAccessToken();
@@ -86,9 +93,3 @@ async function tokenDoctor() {
     throw new Error('Token appears invalid for CRM access.');
   }
 }
-
-module.exports = {
-  getValidAccessToken,
-  refreshAccessToken,
-  tokenDoctor,
-};

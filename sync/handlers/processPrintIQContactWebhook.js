@@ -1,8 +1,8 @@
-const { upsertZohoContact } = require('../helpers/zohoApi');
-const { getValidAccessToken } = require('../auth/tokenManager');
-const syncLogger = require('../../logs/syncLogger');
+import { upsertZohoContact } from '../helpers/zohoApi.js';
+import { getValidAccessToken } from '../auth/tokenManager.js';
+import syncLogger from '../../logs/syncLogger.js';
 
-async function processPrintIQContactWebhook(contactData) {
+export async function processPrintIQContactWebhook(contactData) {
   try {
     await getValidAccessToken();
 
@@ -44,7 +44,3 @@ async function processPrintIQContactWebhook(contactData) {
     syncLogger.error('❌ Contact webhook sync failed:', err.message);
   }
 }
-
-module.exports = {
-  processPrintIQContactWebhook,
-};

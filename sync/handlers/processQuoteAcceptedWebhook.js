@@ -1,19 +1,18 @@
-const {
+import {
   searchDealsByQuoteNumber,
   createNewDeal,
   updateDealStage,
-} = require('../helpers/zohoApi');
-const { getValidAccessToken } = require('../auth/tokenManager');
-const syncLogger = require('../../logs/syncLogger');
+} from '../helpers/zohoApi.js';
+import { getValidAccessToken } from '../auth/tokenManager.js';
+import syncLogger from '../../logs/syncLogger.js';
 
-async function processQuoteAcceptedWebhook(payload) {
+export async function processQuoteAcceptedWebhook(payload) {
   try {
     await getValidAccessToken();
 
     const quoteNo = payload.QuoteNo;
     const customerName =
-      payload.Products[0]?.MiddlewareProductDetail?.cusName ||
-      'Unknown Customer';
+      payload.Products[0]?.MiddlewareProductDetail?.cusName || 'Unknown Customer';
     const totalPriceExTax = payload.TotalPrice;
     const jobReference = payload.JobReference;
     const currencyCode = payload.CurCode || 'GBP';
@@ -47,7 +46,3 @@ async function processQuoteAcceptedWebhook(payload) {
     throw err;
   }
 }
-
-module.exports = {
-  processQuoteAcceptedWebhook,
-};

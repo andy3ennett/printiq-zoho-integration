@@ -1,38 +1,32 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { requireTokenAuth } = require('./auth/tokenAuth');
+import 'dotenv/config';
+import express from 'express';
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const {
-  processPrintIQCustomerWebhook,
-} = require('./sync/handlers/processPrintIQCustomerWebhook');
-const {
-  processPrintIQContactWebhook,
-} = require('./sync/handlers/processPrintIQContactWebhook');
-const {
-  processPrintIQAddressWebhook,
-} = require('./sync/handlers/processPrintIQAddressWebhook');
-// Optional: include if quote webhook is used
-// const { processQuoteAcceptedWebhook } = require('./sync/handlers/processQuoteAcceptedWebhook');
+import { requireTokenAuth } from './sync/auth/tokenAuth.js';
+import processPrintIQCustomerWebhook from './sync/handlers/processPrintIQCustomerWebhook.js';
+import processPrintIQContactWebhook from './sync/handlers/processPrintIQContactWebhook.js';
+import processPrintIQAddressWebhook from './sync/handlers/processPrintIQAddressWebhook.js';
+// import processQuoteAcceptedWebhook from './sync/handlers/processQuoteAcceptedWebhook.js';
+import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 
-const {
-  getValidAccessToken,
-  tokenDoctor,
-} = require('./sync/auth/tokenManager');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const port = 3000;
 
-// OAuth Step 1: Redirect to Zoho authorization
+app.use(express.json());
+
 app.get('/auth', (req, res) => {
   const authUrl = `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/auth?scope=ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.READ&client_id=${process.env.ZOHO_CLIENT_ID}&response_type=code&access_type=offline&prompt=consent&redirect_uri=${process.env.ZOHO_REDIRECT_URI}`;
   res.redirect(authUrl);
 });
 
-// OAuth Step 2: Handle Zoho callback and save tokens
 app.get('/oauth/callback', async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).send('No authorization code provided.');
@@ -73,7 +67,6 @@ app.get('/oauth/callback', async (req, res) => {
   }
 });
 
-// Health check
 app.get('/health-check', async (req, res) => {
   try {
     const token = await getValidAccessToken();
@@ -109,7 +102,6 @@ app.get('/health-check', async (req, res) => {
   }
 });
 
-// Log health check
 app.get('/health/logs', async (req, res) => {
   const logDir = path.join(__dirname, 'logs');
 
@@ -159,7 +151,6 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
   try {
     const token = await getValidAccessToken();
 
-    // Check Zoho CRM connection
     const crmRes = await axios.get(
       `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
       {
@@ -169,7 +160,6 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
 
     const user = crmRes.data.users[0];
 
-    // Get recent logs
     const files = fs
       .readdirSync(logDir)
       .filter(f => f.endsWith('.log'))
@@ -218,7 +208,6 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
   }
 });
 
-// Webhook wrapper
 const withWebhookHandler = handler => async (req, res) => {
   try {
     await handler(req.body);
@@ -228,8 +217,6 @@ const withWebhookHandler = handler => async (req, res) => {
     res.status(500).send('Failed to process webhook.');
   }
 };
-
-app.use(express.json());
 
 app.post(
   '/webhook/printiq/customer',
@@ -243,10 +230,8 @@ app.post(
   '/webhook/printiq/address',
   withWebhookHandler(processPrintIQAddressWebhook)
 );
-// Optional: add if quote webhook is used
 // app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
-// Start server
 app.listen(port, async () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
   try {

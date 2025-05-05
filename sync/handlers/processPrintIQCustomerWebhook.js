@@ -1,12 +1,12 @@
-const {
+import {
   findZohoAccountByPrintIQId,
   createZohoAccount,
   updateZohoAccount,
-} = require('../helpers/zohoApi');
-const { getValidAccessToken } = require('../auth/tokenManager');
-const syncLogger = require('../../logs/syncLogger');
+} from '../helpers/zohoApi.js';
+import { getValidAccessToken } from '../auth/tokenManager.js';
+import syncLogger from '../../logs/syncLogger.js';
 
-async function processPrintIQCustomerWebhook(payload) {
+export async function processPrintIQCustomerWebhook(payload) {
   try {
     await getValidAccessToken();
 
@@ -62,7 +62,3 @@ async function processPrintIQCustomerWebhook(payload) {
     syncLogger.error(`❌ Error handling customer webhook: ${err.message}`);
   }
 }
-
-module.exports = {
-  processPrintIQCustomerWebhook,
-};

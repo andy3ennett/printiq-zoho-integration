@@ -1,107 +1,60 @@
-const axios = require('axios');
-const { getValidAccessToken } = require('../auth/tokenManager');
-const syncLogger = require('../../logs/syncLogger');
+import axios from 'axios';
+import dotenv from 'dotenv';
+import syncLogger from '../../logs/syncLogger.js';
+
+dotenv.config();
 
 const ZOHO_API_BASE = process.env.ZOHO_API_BASE;
+const getAuthHeader = token => ({
+  Authorization: `Zoho-oauthtoken ${token}`,
+  'Content-Type': 'application/json',
+});
 
-async function getHeaders() {
-  const token = await getValidAccessToken();
-  return {
-    Authorization: `Zoho-oauthtoken ${token}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-// 🔍 Find account by PrintIQ ID (same as findAccountByCustomerId)
-async function findZohoAccountByPrintIQId(customerId) {
+export async function findZohoAccountByPrintIQId(printIQCustomerId, token) {
   try {
-    const headers = await getHeaders();
-    const criteria = `(PrintIQ_Customer_ID:equals:${customerId})`;
-    const url = `${ZOHO_API_BASE}/Accounts/search?criteria=${encodeURIComponent(criteria)}`;
-    const response = await axios.get(url, { headers });
+    const response = await axios.get(`${ZOHO_API_BASE}/Accounts/search`, {
+      headers: getAuthHeader(token),
+      params: {
+        criteria: `(PrintIQ_Customer_ID:equals:${printIQCustomerId})`,
+      },
+    });
 
     return response.data.data?.[0] || null;
-  } catch (err) {
+  } catch (error) {
     syncLogger.error(
       'Error finding Zoho Account by Customer ID:',
-      err.response?.data || err.message
+      error.response?.data || error.message
     );
     return null;
   }
 }
 
-// ➕ Create new account
-async function createZohoAccount(accountData) {
+export async function updateAccountAddressSubform(accountId, address, token) {
   try {
-    const headers = await getHeaders();
-    const payload = {
-      data: [accountData],
-      trigger: ['workflow'],
-    };
-    const response = await axios.post(`${ZOHO_API_BASE}/Accounts`, payload, {
-      headers,
-    });
-    return response.data;
-  } catch (err) {
-    syncLogger.error(
-      'Error creating Zoho Account:',
-      err.response?.data || err.message
-    );
-    throw err;
-  }
-}
-
-// 🔁 Update existing account by ID
-async function updateZohoAccount(accountId, updates) {
-  try {
-    const headers = await getHeaders();
+    const updateUrl = `${ZOHO_API_BASE}/Accounts/${accountId}`;
     const payload = {
       data: [
         {
           id: accountId,
-          ...updates,
-        },
-      ],
-    };
-    const response = await axios.put(`${ZOHO_API_BASE}/Accounts`, payload, {
-      headers,
-    });
-    return response.data;
-  } catch (err) {
-    syncLogger.error(
-      'Error updating Zoho Account:',
-      err.response?.data || err.message
-    );
-    throw err;
-  }
-}
-
-// 🧩 Update address subform
-async function updateAccountAddressSubform(accountId, address) {
-  try {
-    const headers = await getHeaders();
-    const subformEntry = {
-      Address_Line_1: address.AddressLine1,
-      Address_Line_2: address.AddressLine2 || '',
-      City: address.City,
-      State: address.State,
-      Post_Code: address.PostCode,
-      Country: address.Country,
-      PrintIQ_Address_Key: address.AddressKey.toString(),
-    };
-
-    const payload = {
-      data: [
-        {
-          id: accountId,
-          Address_Subform: [subformEntry],
+          Address_Subform: [
+            {
+              Address_Line_1: address.AddressLine1,
+              Address_Line_2: address.AddressLine2 || '',
+              City: address.City,
+              State: address.State,
+              Post_Code: address.PostCode,
+              Country: address.Country,
+              PrintIQ_Address_Key: address.AddressKey?.toString(),
+            },
+          ],
         },
       ],
     };
 
-    const response = await axios.put(`${ZOHO_API_BASE}/Accounts`, payload, {
-      headers,
+    const response = await axios.put(updateUrl, payload, {
+      headers: getAuthHeader(token),
     });
+
     return response.data;
   } catch (err) {
     syncLogger.error(
@@ -112,62 +65,19 @@ async function updateAccountAddressSubform(accountId, address) {
   }
 }
 
-// 📄 Optional: Quote/Deal-related methods
-async function searchDealsByQuoteNumber(quoteNo) {
-  const headers = await getHeaders();
-  const response = await axios.get(`${ZOHO_API_BASE}/Deals/search`, {
-    headers,
-    params: {
-      criteria: `(Quote_Number:equals:${quoteNo})`,
-    },
-  });
-
-  return response.data.data?.[0] || null;
-}
-
-async function createNewDeal(deal) {
-  const headers = await getHeaders();
-  const payload = {
-    data: [
-      {
-        Deal_Name: deal.dealName,
-        Amount: deal.amount,
-        Quote_Number: deal.quoteNo,
-        Job_Reference: deal.jobReference,
-        Currency: deal.currency,
-        Stage: deal.stage,
-      },
-    ],
-  };
-
-  const response = await axios.post(`${ZOHO_API_BASE}/Deals`, payload, {
-    headers,
-  });
-  return response.data;
-}
-
-async function updateDealStage(dealId, stage) {
-  const headers = await getHeaders();
-  const payload = {
-    data: [{ id: dealId, Stage: stage }],
-  };
-
-  const response = await axios.put(`${ZOHO_API_BASE}/Deals`, payload, {
-    headers,
-  });
-  return response.data;
-}
-
-// 📇 Contact upsert
-async function upsertZohoContact(contact) {
+export async function upsertZohoContact(contactRecord, token) {
   try {
-    const headers = await getHeaders();
-    const payload = { data: [contact], trigger: ['workflow'] };
+    const url = `${ZOHO_API_BASE}/Contacts/upsert`;
+    const payload = {
+      data: [contactRecord],
+      duplicate_check_fields: ['External_Contact_ID'],
+    };
 
-    const res = await axios.post(`${ZOHO_API_BASE}/Contacts/upsert`, payload, {
-      headers,
+    const response = await axios.post(url, payload, {
+      headers: getAuthHeader(token),
     });
-    return res.data;
+
+    return response.data;
   } catch (err) {
     syncLogger.error(
       'Error upserting contact:',
@@ -177,13 +87,54 @@ async function upsertZohoContact(contact) {
   }
 }
 
-module.exports = {
-  findZohoAccountByPrintIQId,
-  createZohoAccount,
-  updateZohoAccount,
-  updateAccountAddressSubform,
-  searchDealsByQuoteNumber,
-  createNewDeal,
-  updateDealStage,
-  upsertZohoContact,
-};
+export async function searchDealsByQuoteNumber(quoteNo, token) {
+  try {
+    const response = await axios.get(`${ZOHO_API_BASE}/Deals/search`, {
+      headers: getAuthHeader(token),
+      params: {
+        criteria: `(Quote_Number:equals:${quoteNo})`,
+      },
+    });
+
+    return response.data.data?.[0] || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function createNewDeal(dealData, token) {
+  try {
+    const response = await axios.post(
+      `${ZOHO_API_BASE}/Deals`,
+      { data: [dealData] },
+      { headers: getAuthHeader(token) }
+    );
+
+    return response.data;
+  } catch (err) {
+    throw new Error('Error creating new deal: ' + err.message);
+  }
+}
+
+export async function updateDealStage(dealId, stageName, token) {
+  try {
+    const response = await axios.put(
+      `${ZOHO_API_BASE}/Deals`,
+      {
+        data: [
+          {
+            id: dealId,
+            Stage: stageName,
+          },
+        ],
+      },
+      {
+        headers: getAuthHeader(token),
+      }
+    );
+
+    return response.data;
+  } catch (err) {
+    throw new Error('Error updating deal stage: ' + err.message);
+  }
+}

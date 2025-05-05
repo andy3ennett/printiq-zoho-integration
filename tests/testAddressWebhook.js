@@ -1,7 +1,8 @@
-// testAddressWebhook.js
-require('dotenv').config();
-const handleAddressWebhook = require('../sync/handlers/handleAddressWebhook');
-const { refreshAccessToken } = require('../index');
+import dotenv from 'dotenv';
+import { processPrintIQAddressWebhook } from '../sync/handlers/processPrintIQAddressWebhook.js';
+import { refreshAccessToken } from '../sync/auth/tokenManager.js';
+
+dotenv.config();
 
 (async () => {
   try {
@@ -20,8 +21,10 @@ const { refreshAccessToken } = require('../index');
       },
     };
 
-    await handleAddressWebhook(testPayload);
+    await processPrintIQAddressWebhook(testPayload);
+    console.log('✅ Address webhook test completed successfully');
   } catch (err) {
     console.error('❌ Test failed:', err.message);
+    process.exit(1);
   }
 })();

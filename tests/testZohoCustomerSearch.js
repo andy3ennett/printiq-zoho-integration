@@ -1,37 +1,23 @@
-require('dotenv').config({ path: './.env' });
-const axios = require('axios');
-const {
-  refreshAccessToken,
-  getTokens,
-} = require('../sync/helpers/zohoAuthHelpers');
-const { ZOHO_API_BASE } = process.env;
+import { getValidAccessToken } from '../sync/auth/tokenManager.js';
+import { findZohoAccountByPrintIQId } from '../sync/helpers/zohoApi.js';
 
-const testCustomerID = '14357'; // Replace with your test CustomerID
+const testCustomerID = 999;
 
-async function testCustomerLookup() {
+async function runSearchTest() {
   try {
-    await refreshAccessToken();
-    const { access_token } = getTokens();
+    const token = await getValidAccessToken();
+    const account = await findZohoAccountByPrintIQId(testCustomerID, token);
 
-    const response = await axios.get(`${ZOHO_API_BASE}/Accounts/search`, {
-      headers: {
-        Authorization: `Zoho-oauthtoken ${access_token}`,
-      },
-      params: {
-        criteria: `(PrintIQ_Customer_ID:equals:"${testCustomerID}")`,
-      },
-    });
-
-    if (response.data.data && response.data.data.length > 0) {
-      console.log('✅ Found account:', response.data.data[0]);
+    if (account) {
+      console.log('✅ Zoho account found:');
+      console.log(account);
     } else {
-      console.warn(
-        `⚠️ No account found for PrintIQ_Customer_ID = ${testCustomerID}`
-      );
+      console.warn(`⚠️ No account found for PrintIQ_Customer_ID = ${testCustomerID}`);
     }
   } catch (error) {
-    console.error('❌ API error:', error.response?.data || error.message);
+    console.error('❌ Test failed:', error.message);
+    process.exit(1);
   }
 }
 
-testCustomerLookup();
+runSearchTest();
