@@ -1,25 +1,24 @@
 import 'dotenv/config';
 import express from 'express';
-import axios from 'axios';
 import fs from 'fs';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
-import processPrintIQCustomerWebhook from './sync/handlers/processPrintIQCustomerWebhook.js';
-import processPrintIQContactWebhook from './sync/handlers/processPrintIQContactWebhook.js';
-import processPrintIQAddressWebhook from './sync/handlers/processPrintIQAddressWebhook.js';
-// import processQuoteAcceptedWebhook from './sync/handlers/processQuoteAcceptedWebhook.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
+import { processPrintIQCustomerWebhook } from './sync/handlers/processPrintIQCustomerWebhook.js';
+import { processPrintIQContactWebhook } from './sync/handlers/processPrintIQContactWebhook.js';
+import { processPrintIQAddressWebhook } from './sync/handlers/processPrintIQAddressWebhook.js';
+// import { processQuoteAcceptedWebhook } from './sync/handlers/processQuoteAcceptedWebhook.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const port = 3000;
-
+const port = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/auth', (req, res) => {
@@ -59,13 +58,25 @@ app.get('/oauth/callback', async (req, res) => {
     console.log('✅ Authentication successful. Tokens saved.');
     res.send('Authentication successful! You can close this window.');
   } catch (error) {
-    console.error(
-      'OAuth callback error:',
-      error.response?.data || error.message
-    );
+    console.error('OAuth callback error:', error.response?.data || error.message);
     res.status(500).send('Authentication failed.');
   }
 });
+
+const withWebhookHandler = handler => async (req, res) => {
+  try {
+    await handler(req.body);
+    res.status(200).send('Webhook processed successfully.');
+  } catch (error) {
+    console.error('Webhook error:', error.message);
+    res.status(500).send('Failed to process webhook.');
+  }
+};
+
+app.post('/webhook/printiq/customer', withWebhookHandler(processPrintIQCustomerWebhook));
+app.post('/webhook/printiq/contact', withWebhookHandler(processPrintIQContactWebhook));
+app.post('/webhook/printiq/address', withWebhookHandler(processPrintIQAddressWebhook));
+// app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
 app.get('/health-check', async (req, res) => {
   try {
@@ -88,21 +99,19 @@ app.get('/health-check', async (req, res) => {
         id: user.id,
       },
       api_base: process.env.ZOHO_API_BASE,
-      token_expires_in_seconds: Math.round(
-        (user.expires_in - Date.now()) / 1000
-      ),
+      token_expires_in_seconds: Math.round((user.expires_in - Date.now()) / 1000),
     });
   } catch (err) {
-    console.error('Health check failed:', err.response?.data || err.message);
+    console.error('Health check failed:', err.message);
     res.status(500).json({
       status: 'FAIL',
       message: 'Failed to connect to Zoho CRM',
-      error: err.response?.data || err.message,
+      error: err.message,
     });
   }
 });
 
-app.get('/health/logs', async (req, res) => {
+app.get('/health/logs', (req, res) => {
   const logDir = path.join(__dirname, 'logs');
 
   try {
@@ -110,8 +119,7 @@ app.get('/health/logs', async (req, res) => {
       .readdirSync(logDir)
       .filter(f => f.endsWith('.log'))
       .map(file => {
-        const fullPath = path.join(logDir, file);
-        const stats = fs.statSync(fullPath);
+        const stats = fs.statSync(path.join(logDir, file));
         return {
           file,
           sizeKB: Math.round(stats.size / 1024),
@@ -131,12 +139,10 @@ app.get('/health/logs', async (req, res) => {
           free: Math.round(os.freemem() / 1024 / 1024),
         },
       },
-      recentLogs: files
-        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
-        .slice(0, 5),
+      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
     });
   } catch (err) {
-    console.error('Health check log error:', err);
+    console.error('Health check log error:', err.message);
     res.status(500).json({
       status: 'FAIL',
       message: 'Unable to read log directory',
@@ -153,19 +159,15 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
 
     const crmRes = await axios.get(
       `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
-      {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      }
+      { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
     );
 
     const user = crmRes.data.users[0];
-
     const files = fs
       .readdirSync(logDir)
       .filter(f => f.endsWith('.log'))
       .map(file => {
-        const fullPath = path.join(logDir, file);
-        const stats = fs.statSync(fullPath);
+        const stats = fs.statSync(path.join(logDir, file));
         return {
           file,
           sizeKB: Math.round(stats.size / 1024),
@@ -194,9 +196,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
         },
         apiBase: process.env.ZOHO_API_BASE,
       },
-      recentLogs: files
-        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
-        .slice(0, 5),
+      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
     });
   } catch (err) {
     console.error('Health check failure:', err.message);
@@ -207,30 +207,6 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
     });
   }
 });
-
-const withWebhookHandler = handler => async (req, res) => {
-  try {
-    await handler(req.body);
-    res.status(200).send('Webhook processed successfully.');
-  } catch (error) {
-    console.error('Webhook error:', error.message);
-    res.status(500).send('Failed to process webhook.');
-  }
-};
-
-app.post(
-  '/webhook/printiq/customer',
-  withWebhookHandler(processPrintIQCustomerWebhook)
-);
-app.post(
-  '/webhook/printiq/contact',
-  withWebhookHandler(processPrintIQContactWebhook)
-);
-app.post(
-  '/webhook/printiq/address',
-  withWebhookHandler(processPrintIQAddressWebhook)
-);
-// app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
 app.listen(port, async () => {
   console.log(`🚀 Server running at http://localhost:${port}`);

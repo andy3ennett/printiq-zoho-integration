@@ -7,17 +7,8 @@ export async function processPrintIQContactWebhook(contactData) {
     await getValidAccessToken();
 
     const {
-      ContactKey,
-      IntegrationID,
-      FirstName,
-      Surname,
-      FullName,
-      Email,
-      Phone,
-      Mobile,
-      CustomerID,
-      CustomerCode,
-      Title,
+      ContactKey, IntegrationID, FirstName, Surname, FullName,
+      Email, Phone, Mobile, CustomerID, CustomerCode, Title,
     } = contactData;
 
     if (!FullName && !Email) {
@@ -32,9 +23,7 @@ export async function processPrintIQContactWebhook(contactData) {
       Email: Email || '',
       Phone: Phone || Mobile || '',
       Title: Title || '',
-      Account_Name: {
-        name: CustomerCode || `Customer ${CustomerID}`,
-      },
+      Account_Name: { name: CustomerCode || `Customer ${CustomerID}` },
       External_Contact_ID: IntegrationID || String(ContactKey),
     };
 

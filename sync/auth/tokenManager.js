@@ -1,29 +1,22 @@
 import fs from 'fs';
 import axios from 'axios';
+import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import dotenv from 'dotenv';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const TOKEN_FILE = path.resolve(__dirname, '../../token.json');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TOKEN_FILE = path.join(__dirname, '../../token.json');
 let tokens = {};
 
-// Load tokens from disk if available
 if (fs.existsSync(TOKEN_FILE)) {
   tokens = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
 }
 
-// Save tokens to disk
 function saveTokens() {
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
 }
 
-// Refresh Zoho access token using refresh token
 export async function refreshAccessToken() {
   console.log('🔄 Refreshing Zoho access token...');
   try {
@@ -46,20 +39,14 @@ export async function refreshAccessToken() {
 
     console.log('✅ Access token refreshed successfully.');
   } catch (error) {
-    console.error(
-      '❌ Failed to refresh access token:',
-      error.response?.data || error.message
-    );
+    console.error('❌ Failed to refresh access token:', error.response?.data || error.message);
     throw new Error('Failed to refresh access token.');
   }
 }
 
-// Ensure token is valid; refresh if close to expiration
 export async function getValidAccessToken() {
   if (!tokens.access_token || !tokens.expires_in) {
-    throw new Error(
-      '❌ No valid access token found. Please authenticate via /auth.'
-    );
+    throw new Error('❌ No valid access token found. Please authenticate via /auth.');
   }
 
   const msUntilExpiry = tokens.expires_in - Date.now();
@@ -70,24 +57,17 @@ export async function getValidAccessToken() {
   return tokens.access_token;
 }
 
-// Utility for testing token status
 export async function tokenDoctor() {
   console.log('🩺 Running Token Doctor...');
-
   const token = await getValidAccessToken();
 
   try {
-    const response = await axios.get(
-      `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
-      {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      }
-    );
+    const response = await axios.get(`${process.env.ZOHO_API_BASE}/users?type=CurrentUser`, {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    });
 
     const user = response.data.users[0];
-    console.log(
-      `✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`
-    );
+    console.log(`✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`);
   } catch (err) {
     console.error('❌ Token check failed:', err.response?.data || err.message);
     throw new Error('Token appears invalid for CRM access.');
