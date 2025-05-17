@@ -1,0 +1,7 @@
+{
+  "event": "quote_cancelled",
+  "quote_id": "Q1234",
+  "status": "Cancelled",
+  "customer_id": "CUST001",
+  "user": "printIQ.Api.Integration"
+}

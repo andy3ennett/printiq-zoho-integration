@@ -1,10 +1,13 @@
 // scripts/retryWorker.js
 
-import { getDueRetries, markRetryAttempted, removeRetry } from '../utils/retryStore.js';
+import {
+  getDueRetries,
+  markRetryAttempted,
+  removeRetry,
+} from '../utils/retryStore.js';
 import { processPrintIQDealLifecycleWebhook } from '../handlers/processPrintIQDealLifecycleWebhook.js';
 import dotenv from 'dotenv';
 import express from 'express';
-import http from 'http';
 
 dotenv.config();
 
@@ -17,8 +20,8 @@ app.use(express.json());
 function createMockReqRes(payload) {
   const req = { body: payload };
   const res = {
-    status: (code) => ({
-      send: (msg) => console.log(`[${code}]`, msg),
+    status: code => ({
+      send: msg => console.log(`[${code}]`, msg),
     }),
   };
   return { req, res };

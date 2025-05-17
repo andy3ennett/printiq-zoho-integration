@@ -39,14 +39,19 @@ export async function refreshAccessToken() {
 
     console.log('✅ Access token refreshed successfully.');
   } catch (error) {
-    console.error('❌ Failed to refresh access token:', error.response?.data || error.message);
+    console.error(
+      '❌ Failed to refresh access token:',
+      error.response?.data || error.message
+    );
     throw new Error('Failed to refresh access token.');
   }
 }
 
 export async function getValidAccessToken() {
   if (!tokens.access_token || !tokens.expires_in) {
-    throw new Error('❌ No valid access token found. Please authenticate via /auth.');
+    throw new Error(
+      '❌ No valid access token found. Please authenticate via /auth.'
+    );
   }
 
   const msUntilExpiry = tokens.expires_in - Date.now();
@@ -62,12 +67,17 @@ export async function tokenDoctor() {
   const token = await getValidAccessToken();
 
   try {
-    const response = await axios.get(`${process.env.ZOHO_API_BASE}/users?type=CurrentUser`, {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
+    const response = await axios.get(
+      `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
+      {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      }
+    );
 
     const user = response.data.users[0];
-    console.log(`✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`);
+    console.log(
+      `✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`
+    );
   } catch (err) {
     console.error('❌ Token check failed:', err.response?.data || err.message);
     throw new Error('Token appears invalid for CRM access.');

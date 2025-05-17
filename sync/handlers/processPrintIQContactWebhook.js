@@ -7,8 +7,17 @@ export async function processPrintIQContactWebhook(contactData) {
     await getValidAccessToken();
 
     const {
-      ContactKey, IntegrationID, FirstName, Surname, FullName,
-      Email, Phone, Mobile, CustomerID, CustomerCode, Title,
+      ContactKey,
+      IntegrationID,
+      FirstName,
+      Surname,
+      FullName,
+      Email,
+      Phone,
+      Mobile,
+      CustomerID,
+      CustomerCode,
+      Title,
     } = contactData;
 
     if (!FullName && !Email) {

@@ -1,13 +1,7 @@
 import { getValidAccessToken } from '../sync/auth/tokenManager.js';
-import {
-  processPrintIQCustomerWebhook,
-} from '../sync/handlers/processPrintIQCustomerWebhook.js';
-import {
-  processPrintIQContactWebhook,
-} from '../sync/handlers/processPrintIQContactWebhook.js';
-import {
-  processPrintIQAddressWebhook,
-} from '../sync/handlers/processPrintIQAddressWebhook.js';
+import { processPrintIQCustomerWebhook } from '../sync/handlers/processPrintIQCustomerWebhook.js';
+import { processPrintIQContactWebhook } from '../sync/handlers/processPrintIQContactWebhook.js';
+import { processPrintIQAddressWebhook } from '../sync/handlers/processPrintIQAddressWebhook.js';
 
 console.log('🧪 Starting handler module sanity checks...');
 

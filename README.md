@@ -7,6 +7,7 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 ## 🚀 Features
 
 - 🔁 **Webhook Listeners** for:
+
   - Customer create/update → Zoho **Accounts**
   - Contact create/update → Zoho **Contacts**
   - Address updates → Zoho **Account Subforms**
@@ -34,13 +35,15 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 
 ## 🔧 Setup Instructions
 
-1. **Clone the repository**  
+1. **Clone the repository**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/printiq-zoho-integration.git
    cd printiq-zoho-integration
    ```
 
-2. **Install dependencies**  
+2. **Install dependencies**
+
    ```bash
    npm install
    ```
@@ -96,7 +99,7 @@ To follow.
 
 ## 👥 Maintainers
 
-- Original Developer: Andy3ennett 
+- Original Developer: Andy3ennett
 
 ---
 

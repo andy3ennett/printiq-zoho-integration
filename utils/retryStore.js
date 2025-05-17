@@ -20,22 +20,26 @@ const BASE_DELAY_MS = 30000; // 30 seconds base
 export async function saveRetry(entry) {
   entry.attempts = entry.attempts || 0;
   entry.lastTried = new Date().toISOString();
-  entry.nextTry = new Date(Date.now() + getBackoffDelay(entry.attempts)).toISOString();
+  entry.nextTry = new Date(
+    Date.now() + getBackoffDelay(entry.attempts)
+  ).toISOString();
   db.data.retries.push(entry);
   await db.write();
 }
 
 export async function getDueRetries() {
   const now = new Date();
-  return db.data.retries.filter(entry =>
-    entry.attempts < MAX_ATTEMPTS && new Date(entry.nextTry) <= now
+  return db.data.retries.filter(
+    entry => entry.attempts < MAX_ATTEMPTS && new Date(entry.nextTry) <= now
   );
 }
 
 export async function markRetryAttempted(entry) {
   entry.attempts += 1;
   entry.lastTried = new Date().toISOString();
-  entry.nextTry = new Date(Date.now() + getBackoffDelay(entry.attempts)).toISOString();
+  entry.nextTry = new Date(
+    Date.now() + getBackoffDelay(entry.attempts)
+  ).toISOString();
   await db.write();
 }
 

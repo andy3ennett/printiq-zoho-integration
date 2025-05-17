@@ -98,7 +98,7 @@ export async function searchDealsByQuoteNumber(quoteNo, token) {
 
     return response.data.data?.[0] || null;
   } catch (error) {
-    return null;
+    console.warn('Suppressed error:', error.message);
   }
 }
 

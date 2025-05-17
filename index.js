@@ -58,7 +58,10 @@ app.get('/oauth/callback', async (req, res) => {
     console.log('✅ Authentication successful. Tokens saved.');
     res.send('Authentication successful! You can close this window.');
   } catch (error) {
-    console.error('OAuth callback error:', error.response?.data || error.message);
+    console.error(
+      'OAuth callback error:',
+      error.response?.data || error.message
+    );
     res.status(500).send('Authentication failed.');
   }
 });
@@ -73,9 +76,18 @@ const withWebhookHandler = handler => async (req, res) => {
   }
 };
 
-app.post('/webhook/printiq/customer', withWebhookHandler(processPrintIQCustomerWebhook));
-app.post('/webhook/printiq/contact', withWebhookHandler(processPrintIQContactWebhook));
-app.post('/webhook/printiq/address', withWebhookHandler(processPrintIQAddressWebhook));
+app.post(
+  '/webhook/printiq/customer',
+  withWebhookHandler(processPrintIQCustomerWebhook)
+);
+app.post(
+  '/webhook/printiq/contact',
+  withWebhookHandler(processPrintIQContactWebhook)
+);
+app.post(
+  '/webhook/printiq/address',
+  withWebhookHandler(processPrintIQAddressWebhook)
+);
 // app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
 app.get('/health-check', async (req, res) => {
@@ -99,7 +111,9 @@ app.get('/health-check', async (req, res) => {
         id: user.id,
       },
       api_base: process.env.ZOHO_API_BASE,
-      token_expires_in_seconds: Math.round((user.expires_in - Date.now()) / 1000),
+      token_expires_in_seconds: Math.round(
+        (user.expires_in - Date.now()) / 1000
+      ),
     });
   } catch (err) {
     console.error('Health check failed:', err.message);
@@ -139,7 +153,9 @@ app.get('/health/logs', (req, res) => {
           free: Math.round(os.freemem() / 1024 / 1024),
         },
       },
-      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
+      recentLogs: files
+        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+        .slice(0, 5),
     });
   } catch (err) {
     console.error('Health check log error:', err.message);
@@ -196,7 +212,9 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
         },
         apiBase: process.env.ZOHO_API_BASE,
       },
-      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
+      recentLogs: files
+        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+        .slice(0, 5),
     });
   } catch (err) {
     console.error('Health check failure:', err.message);

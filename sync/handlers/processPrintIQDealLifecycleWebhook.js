@@ -1,6 +1,10 @@
 // processPrintIQDealLifecycleWebhook.js
 
-import { findDealByQuoteId, updateDealStage, logMissingDeal } from './zohoClient.js';
+import {
+  findDealByQuoteId,
+  updateDealStage,
+  logMissingDeal,
+} from '../../clients/zohoClient.js';
 import { saveRetry } from './retryStore.js';
 
 const VALID_EVENTS = [
@@ -45,7 +49,9 @@ export async function processPrintIQDealLifecycleWebhook(req, res) {
     if (!deal) {
       await logMissingDeal(quoteId, event);
       await saveRetry({ event, quoteId, reason: 'NOT_FOUND', payload });
-      return res.status(404).send({ message: 'Deal not found, added to retry queue.' });
+      return res
+        .status(404)
+        .send({ message: 'Deal not found, added to retry queue.' });
     }
 
     const targetStage = stageMap[event];
@@ -53,7 +59,11 @@ export async function processPrintIQDealLifecycleWebhook(req, res) {
     res.status(200).send({ message: 'Deal updated successfully.' });
   } catch (error) {
     console.error('Sync error:', error);
-    await saveRetry({ reason: 'EXCEPTION', payload: req.body, error: error.message });
+    await saveRetry({
+      reason: 'EXCEPTION',
+      payload: req.body,
+      error: error.message,
+    });
     res.status(500).send({ message: 'Internal server error.' });
   }
 }

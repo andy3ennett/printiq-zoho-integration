@@ -60,11 +60,7 @@ export async function findAccountByCustomerId(customerId) {
     )}`;
     const response = await axios.get(searchUrl, { headers });
 
-    if (
-      response.data &&
-      response.data.data &&
-      response.data.data.length > 0
-    ) {
+    if (response.data && response.data.data && response.data.data.length > 0) {
       return response.data.data[0];
     }
 

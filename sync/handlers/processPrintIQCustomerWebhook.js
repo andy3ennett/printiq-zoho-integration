@@ -11,8 +11,20 @@ export async function processPrintIQCustomerWebhook(payload) {
     await getValidAccessToken();
 
     const {
-      ID, Name, Phone, Website, Code, Email, Fax, Comment, Active,
-      AddressLine1, City, State, Postcode, Country,
+      ID,
+      Name,
+      Phone,
+      Website,
+      Code,
+      Email,
+      Fax,
+      Comment,
+      Active,
+      AddressLine1,
+      City,
+      State,
+      Postcode,
+      Country,
     } = payload;
 
     if (!ID || !Name) {
