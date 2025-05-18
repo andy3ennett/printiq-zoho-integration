@@ -1,4 +1,4 @@
-import { upsertZohoContact } from '../helpers/zohoApi.js';
+import { createOrUpdateContact } from '../clients/zohoClient.js';
 import { getValidAccessToken } from '../auth/tokenManager.js';
 import syncLogger from '../../logs/syncLogger.js';
 
@@ -36,7 +36,7 @@ export async function processPrintIQContactWebhook(contactData) {
       External_Contact_ID: IntegrationID || String(ContactKey),
     };
 
-    await upsertZohoContact(contactRecord);
+    await createOrUpdateContact(contactRecord);
     syncLogger.log(`✅ Contact synced: ${FullName || Email}`);
   } catch (err) {
     syncLogger.error('❌ Contact webhook sync failed:', err.message);

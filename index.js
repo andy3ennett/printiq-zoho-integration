@@ -12,7 +12,7 @@ import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 import { processPrintIQCustomerWebhook } from './sync/handlers/processPrintIQCustomerWebhook.js';
 import { processPrintIQContactWebhook } from './sync/handlers/processPrintIQContactWebhook.js';
 import { processPrintIQAddressWebhook } from './sync/handlers/processPrintIQAddressWebhook.js';
-// import { processQuoteAcceptedWebhook } from './sync/handlers/processQuoteAcceptedWebhook.js';
+import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -225,6 +225,8 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
     });
   }
 });
+
+app.use('/webhooks/printiq', printiqWebhooks);
 
 app.listen(port, async () => {
   console.log(`🚀 Server running at http://localhost:${port}`);

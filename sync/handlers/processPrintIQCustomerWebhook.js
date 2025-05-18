@@ -1,8 +1,4 @@
-import {
-  findZohoAccountByPrintIQId,
-  createZohoAccount,
-  updateZohoAccount,
-} from '../helpers/zohoApi.js';
+import { createOrUpdateCustomer } from '../clients/zohoClient.js';
 import { getValidAccessToken } from '../auth/tokenManager.js';
 import syncLogger from '../../logs/syncLogger.js';
 
@@ -32,8 +28,6 @@ export async function processPrintIQCustomerWebhook(payload) {
       return;
     }
 
-    const existingAccount = await findZohoAccountByPrintIQId(ID);
-
     const zohoPayload = {
       Account_Name: Name,
       Phone,
@@ -50,14 +44,8 @@ export async function processPrintIQCustomerWebhook(payload) {
       Billing_Code: Postcode || '',
       Billing_Country: Country || '',
     };
-
-    if (existingAccount) {
-      await updateZohoAccount(existingAccount.id, zohoPayload);
-      syncLogger.success(`✅ Updated customer in Zoho CRM: ${Name}`);
-    } else {
-      await createZohoAccount(zohoPayload);
-      syncLogger.success(`✅ Created customer in Zoho CRM: ${Name}`);
-    }
+    await createOrUpdateCustomer(zohoPayload);
+    syncLogger.success(`✅ Synced customer in Zoho CRM: ${Name}`);
   } catch (err) {
     syncLogger.error(`❌ Error handling customer webhook: ${err.message}`);
   }
