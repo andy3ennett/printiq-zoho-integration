@@ -9,9 +9,6 @@ import { dirname } from 'path';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
-import { processPrintIQCustomerWebhook } from './sync/handlers/processPrintIQCustomerWebhook.js';
-import { processPrintIQContactWebhook } from './sync/handlers/processPrintIQContactWebhook.js';
-import { processPrintIQAddressWebhook } from './sync/handlers/processPrintIQAddressWebhook.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,30 +62,6 @@ app.get('/oauth/callback', async (req, res) => {
     res.status(500).send('Authentication failed.');
   }
 });
-
-const withWebhookHandler = handler => async (req, res) => {
-  try {
-    await handler(req.body);
-    res.status(200).send('Webhook processed successfully.');
-  } catch (error) {
-    console.error('Webhook error:', error.message);
-    res.status(500).send('Failed to process webhook.');
-  }
-};
-
-app.post(
-  '/webhook/printiq/customer',
-  withWebhookHandler(processPrintIQCustomerWebhook)
-);
-app.post(
-  '/webhook/printiq/contact',
-  withWebhookHandler(processPrintIQContactWebhook)
-);
-app.post(
-  '/webhook/printiq/address',
-  withWebhookHandler(processPrintIQAddressWebhook)
-);
-// app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
 app.get('/health-check', async (req, res) => {
   try {
