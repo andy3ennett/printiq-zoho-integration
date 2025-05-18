@@ -1,0 +1,10 @@
+{
+  "event": "invoice_created",
+  "quote_id": "Q1234",
+  "invoice_id": "INV7890",
+  "invoice_number": "INV-10001",
+  "invoice_date": "2025-05-01",
+  "invoice_value": 1500,
+  "customer_id": "CUST001",
+  "user": "printIQ.Api.Integration"
+}

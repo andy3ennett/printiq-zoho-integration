@@ -1,0 +1,7 @@
+{
+  "event": "quote_created",
+  "quote_id": "Q1234",
+  "status": "Awaiting Acceptance",
+  "customer_id": "CUST001",
+  "user": "printIQ.Api.Integration"
+}

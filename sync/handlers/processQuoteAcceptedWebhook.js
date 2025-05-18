@@ -12,14 +12,17 @@ export async function processQuoteAcceptedWebhook(payload) {
 
     const quoteNo = payload.QuoteNo;
     const customerName =
-      payload.Products?.[0]?.MiddlewareProductDetail?.cusName || 'Unknown Customer';
+      payload.Products?.[0]?.MiddlewareProductDetail?.cusName ||
+      'Unknown Customer';
     const totalPriceExTax = payload.TotalPrice;
     const jobReference = payload.JobReference;
     const currencyCode = payload.CurCode || 'GBP';
 
     if (!quoteNo) throw new Error('Missing Quote Number in payload');
 
-    syncLogger.log(`📨 Received Quote Acceptance webhook for QuoteNo: ${quoteNo}`);
+    syncLogger.log(
+      `📨 Received Quote Acceptance webhook for QuoteNo: ${quoteNo}`
+    );
 
     const existingDeal = await searchDealsByQuoteNumber(quoteNo);
 

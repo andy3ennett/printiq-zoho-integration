@@ -1,0 +1,20 @@
+{
+  "retries": [
+    {
+      "event": "quote_accepted",
+      "quoteId": "Q1234",
+      "error_type": "NOT_FOUND",
+      "last_error_message": "Deal not found by Quote ID",
+      "payload": {
+        "event": "quote_accepted",
+        "quote_id": "Q1234",
+        "status": "Accepted",
+        "customer_id": "CUST001",
+        "user": "printIQ.Api.Integration"
+      },
+      "attempts": 0,
+      "lastTried": "2025-05-18T19:49:17.385Z",
+      "nextTry": "2025-05-18T19:49:47.385Z"
+    }
+  ]
+}

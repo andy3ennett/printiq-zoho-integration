@@ -33,10 +33,14 @@ jsFiles.forEach(file => {
   const relativePath = file.replace(`${__dirname}/../`, '');
 
   const exportsMatch = [
-    ...content.matchAll(/export\s+(?:default\s+)?(function|const|async function)?\s*([\w$]+)/g),
+    ...content.matchAll(
+      /export\s+(?:default\s+)?(function|const|async function)?\s*([\w$]+)/g
+    ),
     ...content.matchAll(/export\s*{\s*([^}]+)\s*}/g),
   ];
-  const importsMatch = [...content.matchAll(/import\s+(.*)\s+from\s+['"](.*)['"]/g)];
+  const importsMatch = [
+    ...content.matchAll(/import\s+(.*)\s+from\s+['"](.*)['"]/g),
+  ];
 
   allExports[relativePath] = exportsMatch.map(m => m[2] || m[1]);
   allImports[relativePath] = importsMatch.map(m => m[2]);

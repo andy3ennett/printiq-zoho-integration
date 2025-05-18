@@ -98,7 +98,7 @@ export async function searchDealsByQuoteNumber(quoteNo, token) {
 
     return response.data.data?.[0] || null;
   } catch (error) {
-    return null;
+    console.warn('Suppressed error:', error.message);
   }
 }
 
@@ -136,5 +136,49 @@ export async function updateDealStage(dealId, stageName, token) {
     return response.data;
   } catch (err) {
     throw new Error('Error updating deal stage: ' + err.message);
+  }
+}
+
+export async function createZohoAccount(accountData, token) {
+  try {
+    const response = await axios.post(
+      `${ZOHO_API_BASE}/Accounts`,
+      { data: [accountData] },
+      { headers: getAuthHeader(token) }
+    );
+
+    return response.data;
+  } catch (err) {
+    syncLogger.error(
+      'Error creating Zoho Account:',
+      err.response?.data || err.message
+    );
+    throw err;
+  }
+}
+
+export async function updateZohoAccount(accountId, updateData, token) {
+  try {
+    const response = await axios.put(
+      `${ZOHO_API_BASE}/Accounts`,
+      {
+        data: [
+          {
+            id: accountId,
+            ...updateData,
+          },
+        ],
+      },
+      {
+        headers: getAuthHeader(token),
+      }
+    );
+    return response.data;
+  } catch (err) {
+    syncLogger.error(
+      'Error updating Zoho Account:',
+      err.response?.data || err.message
+    );
+    throw err;
   }
 }

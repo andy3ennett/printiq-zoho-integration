@@ -16,9 +16,18 @@ const withWebhookHandler = handler => async (req, res) => {
   }
 };
 
-router.post('/webhook/printiq/customer', withWebhookHandler(processPrintIQCustomerWebhook));
-router.post('/webhook/printiq/contact', withWebhookHandler(processPrintIQContactWebhook));
-router.post('/webhook/printiq/address', withWebhookHandler(processPrintIQAddressWebhook));
+router.post(
+  '/webhook/printiq/customer',
+  withWebhookHandler(processPrintIQCustomerWebhook)
+);
+router.post(
+  '/webhook/printiq/contact',
+  withWebhookHandler(processPrintIQContactWebhook)
+);
+router.post(
+  '/webhook/printiq/address',
+  withWebhookHandler(processPrintIQAddressWebhook)
+);
 // router.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook)); // Optional
 
 export default router;

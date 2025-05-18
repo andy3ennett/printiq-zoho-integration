@@ -12,7 +12,9 @@ async function runSearchTest() {
       console.log('✅ Zoho account found:');
       console.log(account);
     } else {
-      console.warn(`⚠️ No account found for PrintIQ_Customer_ID = ${testCustomerID}`);
+      console.warn(
+        `⚠️ No account found for PrintIQ_Customer_ID = ${testCustomerID}`
+      );
     }
   } catch (error) {
     console.error('❌ Test failed:', error.message);

@@ -9,10 +9,7 @@ import { dirname } from 'path';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
-import { processPrintIQCustomerWebhook } from './sync/handlers/processPrintIQCustomerWebhook.js';
-import { processPrintIQContactWebhook } from './sync/handlers/processPrintIQContactWebhook.js';
-import { processPrintIQAddressWebhook } from './sync/handlers/processPrintIQAddressWebhook.js';
-// import { processQuoteAcceptedWebhook } from './sync/handlers/processQuoteAcceptedWebhook.js';
+import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -58,25 +55,13 @@ app.get('/oauth/callback', async (req, res) => {
     console.log('✅ Authentication successful. Tokens saved.');
     res.send('Authentication successful! You can close this window.');
   } catch (error) {
-    console.error('OAuth callback error:', error.response?.data || error.message);
+    console.error(
+      'OAuth callback error:',
+      error.response?.data || error.message
+    );
     res.status(500).send('Authentication failed.');
   }
 });
-
-const withWebhookHandler = handler => async (req, res) => {
-  try {
-    await handler(req.body);
-    res.status(200).send('Webhook processed successfully.');
-  } catch (error) {
-    console.error('Webhook error:', error.message);
-    res.status(500).send('Failed to process webhook.');
-  }
-};
-
-app.post('/webhook/printiq/customer', withWebhookHandler(processPrintIQCustomerWebhook));
-app.post('/webhook/printiq/contact', withWebhookHandler(processPrintIQContactWebhook));
-app.post('/webhook/printiq/address', withWebhookHandler(processPrintIQAddressWebhook));
-// app.post('/webhook/printiq/quote-accepted', withWebhookHandler(processQuoteAcceptedWebhook));
 
 app.get('/health-check', async (req, res) => {
   try {
@@ -99,7 +84,9 @@ app.get('/health-check', async (req, res) => {
         id: user.id,
       },
       api_base: process.env.ZOHO_API_BASE,
-      token_expires_in_seconds: Math.round((user.expires_in - Date.now()) / 1000),
+      token_expires_in_seconds: Math.round(
+        (user.expires_in - Date.now()) / 1000
+      ),
     });
   } catch (err) {
     console.error('Health check failed:', err.message);
@@ -139,7 +126,9 @@ app.get('/health/logs', (req, res) => {
           free: Math.round(os.freemem() / 1024 / 1024),
         },
       },
-      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
+      recentLogs: files
+        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+        .slice(0, 5),
     });
   } catch (err) {
     console.error('Health check log error:', err.message);
@@ -196,7 +185,9 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
         },
         apiBase: process.env.ZOHO_API_BASE,
       },
-      recentLogs: files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, 5),
+      recentLogs: files
+        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+        .slice(0, 5),
     });
   } catch (err) {
     console.error('Health check failure:', err.message);
@@ -207,6 +198,8 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
     });
   }
 });
+
+app.use('/webhooks/printiq', printiqWebhooks);
 
 app.listen(port, async () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
