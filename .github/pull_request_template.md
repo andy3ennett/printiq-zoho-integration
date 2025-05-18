@@ -1,4 +1,3 @@
-
 ## 🚀 Feature Summary
 
 This PR finalizes CLI integration and webhook routing for the PrintIQ-Zoho middleware, supporting all mapped event types.
