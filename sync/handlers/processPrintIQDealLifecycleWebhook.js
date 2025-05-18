@@ -62,8 +62,8 @@ export function createDealLifecycleHandler({
           payload,
         });
         return res
-          .status(404)
-          .send({ message: 'Deal not found, added to retry queue.' });
+          .status(202)
+          .send({ message: 'Retry queued: deal not found.' });
       }
 
       const targetStage = stageMap[event];

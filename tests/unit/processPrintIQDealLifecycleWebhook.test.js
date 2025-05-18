@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { createDealLifecycleHandler } from '../../sync/handlers/processPrintIQDealLifecycleWebhook.js';
 
 let mockDeps;
@@ -6,20 +6,20 @@ let handler;
 
 const mockRes = () => {
   const res = {};
-  res.status = jest.fn().mockReturnValue(res);
-  res.send = jest.fn().mockReturnValue(res);
+  res.status = vi.fn().mockReturnValue(res);
+  res.send = vi.fn().mockReturnValue(res);
   return res;
 };
 
 describe('processPrintIQDealLifecycleWebhook', () => {
   beforeEach(async () => {
-    jest.resetModules();
-    jest.clearAllMocks();
+    vi.resetModules();
+    vi.clearAllMocks();
     mockDeps = {
-      findDealByQuoteId: jest.fn(),
-      updateDealStage: jest.fn(),
-      logMissingDeal: jest.fn(),
-      saveRetry: jest.fn(),
+      findDealByQuoteId: vi.fn(),
+      updateDealStage: vi.fn(),
+      logMissingDeal: vi.fn(),
+      saveRetry: vi.fn(),
     };
     handler = createDealLifecycleHandler(mockDeps);
   });

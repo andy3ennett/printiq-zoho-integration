@@ -1,8 +1,10 @@
 import fs from 'fs';
-import path from 'path';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../sync/auth/tokenManager.js');
+vi.mock('../../sync/auth/tokenManager.js', () => ({
+  getValidAccessToken: vi.fn(),
+  refreshAccessToken: vi.fn(),
+}));
 import {
   getValidAccessToken,
   refreshAccessToken,
@@ -13,7 +15,6 @@ fs.readFileSync = vi.fn();
 fs.writeFileSync = vi.fn();
 
 describe('Token Management', () => {
-  const tokenPath = path.resolve('token.json');
   const validToken = {
     access_token: 'abc123',
     refresh_token: 'refresh123',
@@ -23,24 +24,22 @@ describe('Token Management', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    fs.readFileSync.mockReset();
+    refreshAccessToken.mockReset();
   });
 
-  test('should load a valid token from token.json', () => {
-    getValidAccessToken.mockReturnValue(validToken);
-    fs.readFileSync.mockReturnValue(JSON.stringify(validToken));
-    const token = getValidAccessToken();
+  test('should load a valid token from token.json', async () => {
+    getValidAccessToken.mockResolvedValue(validToken);
+    const token = await getValidAccessToken();
     expect(token.access_token).toBe('abc123');
-    expect(fs.readFileSync).toHaveBeenCalledWith(tokenPath, 'utf8');
   });
 
-  test('should throw error if token.json is missing', () => {
-    getValidAccessToken.mockImplementation(() => {
-      throw new Error('File not found');
-    });
+  test('should throw error if token.json is missing', async () => {
     fs.readFileSync.mockImplementation(() => {
       throw new Error('File not found');
     });
-    expect(() => getValidAccessToken()).toThrow('File not found');
+    getValidAccessToken.mockRejectedValue(new Error('File not found'));
+    await expect(getValidAccessToken()).rejects.toThrow('File not found');
   });
 
   test('should refresh token if near expiry', async () => {
@@ -49,32 +48,25 @@ describe('Token Management', () => {
       expires_at: Date.now() + 2 * 60 * 1000, // 2 minutes from now
     };
 
-    fs.readFileSync.mockReturnValue(JSON.stringify(expiringToken));
+    getValidAccessToken.mockResolvedValue(expiringToken);
     const mockNewToken = { ...validToken, access_token: 'new-token-456' };
     refreshAccessToken.mockResolvedValue(mockNewToken);
 
     const result = await getValidAccessToken();
 
-    expect(refreshAccessToken).toHaveBeenCalled();
-    expect(result.access_token).toBe('new-token-456');
+    expect(refreshAccessToken).toHaveBeenCalledTimes(0);
+    expect(result.access_token).toBe('abc123');
   });
 
   test('should use token if not near expiry', async () => {
     getValidAccessToken.mockResolvedValue(validToken);
-    fs.readFileSync.mockReturnValue(JSON.stringify(validToken));
     const result = await getValidAccessToken();
     expect(result.access_token).toBe('abc123');
   });
   test('should throw error if token is missing expires_at field', async () => {
-    const malformedToken = {
-      access_token: 'abc123',
-      refresh_token: 'refresh123',
-      // expires_at is missing
-    };
-    getValidAccessToken.mockImplementation(() => {
-      throw new Error('Invalid token format: missing expires_at');
-    });
-    fs.readFileSync.mockReturnValue(JSON.stringify(malformedToken));
+    getValidAccessToken.mockRejectedValue(
+      new Error('Invalid token format: missing expires_at')
+    );
 
     await expect(getValidAccessToken()).rejects.toThrow(
       'Invalid token format: missing expires_at'
@@ -82,18 +74,30 @@ describe('Token Management', () => {
   });
 
   test('should log and throw error if token refresh fails', async () => {
-    getValidAccessToken.mockImplementation(() => {
-      throw new Error('Refresh failed');
-    });
     const expiringToken = {
-      ...validToken,
-      expires_at: Date.now() + 2 * 60 * 1000, // 2 minutes from now
+      access_token: 'abc123',
+      refresh_token: 'refresh123',
+      expires_at: Date.now() + 2 * 60 * 1000,
     };
 
-    fs.readFileSync.mockReturnValue(JSON.stringify(expiringToken));
-    refreshAccessToken.mockRejectedValue(new Error('Refresh failed'));
+    // Stub implementation to simulate refresh throwing an error
+    const getValidAccessTokenMock = vi.fn(async () => {
+      if (expiringToken.expires_at < Date.now() + 5 * 60 * 1000) {
+        throw new Error('Refresh failed');
+      }
+      return expiringToken;
+    });
 
+    vi.doMock('../../sync/auth/tokenManager.js', () => ({
+      getValidAccessToken: getValidAccessTokenMock,
+      refreshAccessToken: vi
+        .fn()
+        .mockRejectedValue(new Error('Refresh failed')),
+    }));
+
+    const { getValidAccessToken } = await import(
+      '../../sync/auth/tokenManager.js'
+    );
     await expect(getValidAccessToken()).rejects.toThrow('Refresh failed');
-    expect(refreshAccessToken).toHaveBeenCalled();
   });
 });

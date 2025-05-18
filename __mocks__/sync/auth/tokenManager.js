@@ -1,2 +1,4 @@
-export const getValidAccessToken = jest.fn();
-export const refreshAccessToken = jest.fn();
+import { vi } from 'vitest';
+
+export const getValidAccessToken = vi.fn();
+export const refreshAccessToken = vi.fn();

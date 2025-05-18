@@ -83,3 +83,11 @@ export async function tokenDoctor() {
     throw new Error('Token appears invalid for CRM access.');
   }
 }
+
+export function _resetTokens() {
+  tokens = {};
+}
+
+export function _setTokens(newTokens) {
+  tokens = newTokens;
+}

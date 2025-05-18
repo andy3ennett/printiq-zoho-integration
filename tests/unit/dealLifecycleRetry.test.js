@@ -43,11 +43,11 @@ describe('deal lifecycle retry logic', () => {
 
     expect(mockDeps.findDealByQuoteId).toHaveBeenCalledWith('Q5678');
     expect(mockDeps.saveRetry).toHaveBeenCalledWith({
-      quoteId: 'Q5678',
       payload: req.body,
       error_type: 'NOT_FOUND',
       last_error_message: 'Deal not found by Quote ID',
       event: 'quote_accepted',
+      quoteId: 'Q5678',
     });
     expect(res.status).toHaveBeenCalledWith(202);
   });
@@ -76,12 +76,10 @@ describe('deal lifecycle retry logic', () => {
       req.body
     );
     expect(mockDeps.saveRetry).toHaveBeenCalledWith({
-      quoteId: 'Q7777',
       payload: req.body,
       error_type: 'EXCEPTION',
       last_error_message: 'Zoho API failure',
-      event: 'quote_accepted',
     });
-    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 });
