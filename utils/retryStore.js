@@ -23,6 +23,8 @@ export async function saveRetry(entry) {
   entry.nextTry = new Date(
     Date.now() + getBackoffDelay(entry.attempts)
   ).toISOString();
+  entry.error_type = entry.error_type || 'UNKNOWN';
+  entry.last_error_message = entry.last_error_message || '';
   db.data.retries.push(entry);
   await db.write();
 }
@@ -34,9 +36,10 @@ export async function getDueRetries() {
   );
 }
 
-export async function markRetryAttempted(entry) {
+export async function markRetryAttempted(entry, errorMessage) {
   entry.attempts += 1;
   entry.lastTried = new Date().toISOString();
+  if (errorMessage) entry.last_error_message = errorMessage;
   entry.nextTry = new Date(
     Date.now() + getBackoffDelay(entry.attempts)
   ).toISOString();

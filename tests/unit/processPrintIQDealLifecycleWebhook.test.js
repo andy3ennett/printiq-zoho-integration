@@ -1,9 +1,8 @@
-import { processPrintIQDealLifecycleWebhook } from '../../handlers/processPrintIQDealLifecycleWebhook.js';
-import * as zohoClient from '../../clients/zohoClient.js';
-import * as retryStore from '../../utils/retryStore.js';
+import { jest } from '@jest/globals';
+import { createDealLifecycleHandler } from '../../sync/handlers/processPrintIQDealLifecycleWebhook.js';
 
-jest.mock('../../clients/zohoClient.js');
-jest.mock('../../utils/retryStore.js');
+let mockDeps;
+let handler;
 
 const mockRes = () => {
   const res = {};
@@ -13,8 +12,16 @@ const mockRes = () => {
 };
 
 describe('processPrintIQDealLifecycleWebhook', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    jest.resetModules();
     jest.clearAllMocks();
+    mockDeps = {
+      findDealByQuoteId: jest.fn(),
+      updateDealStage: jest.fn(),
+      logMissingDeal: jest.fn(),
+      saveRetry: jest.fn(),
+    };
+    handler = createDealLifecycleHandler(mockDeps);
   });
 
   test('should update deal stage when quote_accepted event is received', async () => {
@@ -29,13 +36,17 @@ describe('processPrintIQDealLifecycleWebhook', () => {
     };
     const res = mockRes();
 
-    zohoClient.findDealByQuoteId.mockResolvedValue({ id: 'deal123' });
-    zohoClient.updateDealStage.mockResolvedValue({ success: true });
+    mockDeps.findDealByQuoteId.mockResolvedValue({ id: 'deal123' });
+    mockDeps.updateDealStage.mockResolvedValue({ success: true });
 
-    await processPrintIQDealLifecycleWebhook(req, res);
+    await handler(req, res);
 
-    expect(zohoClient.findDealByQuoteId).toHaveBeenCalledWith('Q1234');
-    expect(zohoClient.updateDealStage).toHaveBeenCalledWith('deal123', 'Accepted', req.body);
+    expect(mockDeps.findDealByQuoteId).toHaveBeenCalledWith('Q1234');
+    expect(mockDeps.updateDealStage).toHaveBeenCalledWith(
+      'deal123',
+      'Accepted',
+      req.body
+    );
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -51,18 +62,20 @@ describe('processPrintIQDealLifecycleWebhook', () => {
     };
     const res = mockRes();
 
-    await processPrintIQDealLifecycleWebhook(req, res);
+    await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith({ message: 'Ignored Infigo quote.' });
-    expect(zohoClient.findDealByQuoteId).not.toHaveBeenCalled();
+    expect(mockDeps.findDealByQuoteId).not.toHaveBeenCalled();
   });
 
   test('should return 400 if quote_id is missing', async () => {
-    const req = { body: { event: 'quote_accepted', user: 'printIQ.Api.Integration' } };
+    const req = {
+      body: { event: 'quote_accepted', user: 'printIQ.Api.Integration' },
+    };
     const res = mockRes();
 
-    await processPrintIQDealLifecycleWebhook(req, res);
+    await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith({ message: 'Missing Quote ID' });

@@ -16,6 +16,10 @@ async function getAccessToken() {
   return tokenData.access_token;
 }
 
+export function logMissingDeal(quoteId, event) {
+  console.warn(`[Missing Deal] Quote ID: ${quoteId}, Event: ${event}`);
+}
+
 export async function findDealByQuoteId(quoteId) {
   const token = await getAccessToken();
   const url = `${ZOHO_API_BASE}/${ZOHO_DEAL_MODULE}/search?criteria=(${QUOTE_ID_FIELD}:equals:"${quoteId}")`;

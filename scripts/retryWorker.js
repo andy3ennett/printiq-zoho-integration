@@ -45,7 +45,10 @@ async function runRetries() {
       await removeRetry(entry);
     } catch (err) {
       console.error('Retry attempt failed:', err.message);
-      await markRetryAttempted(entry);
+      console.log(
+        `  ↳ Event: ${entry.event}, Quote ID: ${entry.quoteId}, Type: ${entry.error_type}`
+      );
+      await markRetryAttempted(entry, err.message);
     }
   }
 }
