@@ -4,10 +4,12 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage",
+    "dev": "NODE_ENV=development node index.js",
+    "start": "NODE_ENV=production node index.js",
     "lint": "eslint .",
+    "typecheck": "tsc -p . --noEmit || true",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write .",
     "prepare": "husky install"
   },
