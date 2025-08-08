@@ -55,8 +55,8 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
    ZOHO_CLIENT_ID=your_client_id
    ZOHO_CLIENT_SECRET=your_client_secret
    ZOHO_REDIRECT_URI=http://localhost:3000/oauth/callback
-   ZOHO_ACCOUNTS_URL=https://accounts.zoho.eu
-   ZOHO_API_BASE=https://www.zohoapis.eu/crm/v2
+   ZOHO_ACCOUNTS_URL=https://accounts.zoho.com
+   ZOHO_BASE_URL=https://www.zohoapis.com/crm/v2
    PORT=3000
    HEALTH_TOKEN=your_token_for_protected_health_routes
    ```

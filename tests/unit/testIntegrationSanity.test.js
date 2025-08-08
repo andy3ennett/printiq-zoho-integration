@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
+vi.mock('../../sync/auth/tokenManager.js', () => ({
+  getValidAccessToken: vi.fn().mockResolvedValue('token'),
+}));
+vi.mock('../../sync/clients/zohoClient.js', () => ({
+  createOrUpdateCustomer: vi.fn().mockResolvedValue({}),
+  createOrUpdateContact: vi.fn().mockResolvedValue({}),
+  createOrUpdateAddress: vi.fn().mockResolvedValue({}),
+}));
 import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
 import { processPrintIQCustomerWebhook } from '../../sync/handlers/processPrintIQCustomerWebhook.js';
 import { processPrintIQContactWebhook } from '../../sync/handlers/processPrintIQContactWebhook.js';

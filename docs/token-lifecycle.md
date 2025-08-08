@@ -22,7 +22,7 @@ Zoho CRM API access is secured using OAuth 2.0 tokens. This integration uses a c
   ZOHO_CLIENT_ID=
   ZOHO_CLIENT_SECRET=
   ZOHO_REFRESH_TOKEN=
-  ZOHO_API_BASE_URL=https://www.zohoapis.com/crm/v2
+  ZOHO_BASE_URL=https://www.zohoapis.com/crm/v2
   ```
 
 - **token.json**

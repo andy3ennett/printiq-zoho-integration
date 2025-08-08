@@ -1,10 +1,6 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import syncLogger from '../../logs/syncLogger.js';
-
-dotenv.config();
-
-const ZOHO_API_BASE = process.env.ZOHO_API_BASE;
+import { zohoUrl } from '../../src/config/env.js';
 const getAuthHeader = token => ({
   Authorization: `Zoho-oauthtoken ${token}`,
   'Content-Type': 'application/json',
@@ -12,7 +8,7 @@ const getAuthHeader = token => ({
 
 export async function findZohoAccountByPrintIQId(printIQCustomerId, token) {
   try {
-    const response = await axios.get(`${ZOHO_API_BASE}/Accounts/search`, {
+    const response = await axios.get(zohoUrl('Accounts/search'), {
       headers: getAuthHeader(token),
       params: {
         criteria: `(PrintIQ_Customer_ID:equals:${printIQCustomerId})`,
@@ -31,7 +27,7 @@ export async function findZohoAccountByPrintIQId(printIQCustomerId, token) {
 
 export async function updateAccountAddressSubform(accountId, address, token) {
   try {
-    const updateUrl = `${ZOHO_API_BASE}/Accounts/${accountId}`;
+    const updateUrl = zohoUrl(`Accounts/${accountId}`);
     const payload = {
       data: [
         {
@@ -67,7 +63,7 @@ export async function updateAccountAddressSubform(accountId, address, token) {
 
 export async function upsertZohoContact(contactRecord, token) {
   try {
-    const url = `${ZOHO_API_BASE}/Contacts/upsert`;
+    const url = zohoUrl('Contacts/upsert');
     const payload = {
       data: [contactRecord],
       duplicate_check_fields: ['External_Contact_ID'],
@@ -89,7 +85,7 @@ export async function upsertZohoContact(contactRecord, token) {
 
 export async function searchDealsByQuoteNumber(quoteNo, token) {
   try {
-    const response = await axios.get(`${ZOHO_API_BASE}/Deals/search`, {
+    const response = await axios.get(zohoUrl('Deals/search'), {
       headers: getAuthHeader(token),
       params: {
         criteria: `(Quote_Number:equals:${quoteNo})`,
@@ -105,7 +101,7 @@ export async function searchDealsByQuoteNumber(quoteNo, token) {
 export async function createNewDeal(dealData, token) {
   try {
     const response = await axios.post(
-      `${ZOHO_API_BASE}/Deals`,
+      zohoUrl('Deals'),
       { data: [dealData] },
       { headers: getAuthHeader(token) }
     );
@@ -119,7 +115,7 @@ export async function createNewDeal(dealData, token) {
 export async function updateDealStage(dealId, stageName, token) {
   try {
     const response = await axios.put(
-      `${ZOHO_API_BASE}/Deals`,
+      zohoUrl('Deals'),
       {
         data: [
           {
@@ -142,7 +138,7 @@ export async function updateDealStage(dealId, stageName, token) {
 export async function createZohoAccount(accountData, token) {
   try {
     const response = await axios.post(
-      `${ZOHO_API_BASE}/Accounts`,
+      zohoUrl('Accounts'),
       { data: [accountData] },
       { headers: getAuthHeader(token) }
     );
@@ -160,7 +156,7 @@ export async function createZohoAccount(accountData, token) {
 export async function updateZohoAccount(accountId, updateData, token) {
   try {
     const response = await axios.put(
-      `${ZOHO_API_BASE}/Accounts`,
+      zohoUrl('Accounts'),
       {
         data: [
           {

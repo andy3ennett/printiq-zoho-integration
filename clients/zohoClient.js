@@ -2,12 +2,7 @@
 
 import axios from 'axios';
 import fs from 'fs/promises';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const ZOHO_API_BASE =
-  process.env.ZOHO_API_BASE_URL || 'https://www.zohoapis.com/crm/v2';
+import { zohoUrl } from '../src/config/env.js';
 const ZOHO_DEAL_MODULE = 'Deals';
 const QUOTE_ID_FIELD = 'PrintIQ_Quote_ID';
 
@@ -22,7 +17,9 @@ export function logMissingDeal(quoteId, event) {
 
 export async function findDealByQuoteId(quoteId) {
   const token = await getAccessToken();
-  const url = `${ZOHO_API_BASE}/${ZOHO_DEAL_MODULE}/search?criteria=(${QUOTE_ID_FIELD}:equals:"${quoteId}")`;
+  const url = zohoUrl(
+    `${ZOHO_DEAL_MODULE}/search?criteria=(${QUOTE_ID_FIELD}:equals:"${quoteId}")`
+  );
 
   try {
     const response = await axios.get(url, {
@@ -42,7 +39,7 @@ export async function findDealByQuoteId(quoteId) {
 
 export async function updateDealStage(dealId, stage, payload = {}) {
   const token = await getAccessToken();
-  const url = `${ZOHO_API_BASE}/${ZOHO_DEAL_MODULE}/${dealId}`;
+  const url = zohoUrl(`${ZOHO_DEAL_MODULE}/${dealId}`);
 
   const updateFields = {
     Stage: stage,

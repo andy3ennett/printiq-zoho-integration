@@ -1,9 +1,7 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-
-dotenv.config();
+import { zohoUrl } from '../../src/config/env.js';
 
 const tokenData = JSON.parse(
   fs.readFileSync(path.resolve('./token.json'), 'utf-8')
@@ -22,7 +20,7 @@ export async function createOrUpdateZohoAccount(accountData) {
 
   try {
     const criteria = `((Integration_ID:equals:${accountData.Integration_ID}) or (Customer_Code:equals:${accountData.Customer_Code}))`;
-    const searchUrl = `${process.env.ZOHO_API_BASE}/Accounts/search?criteria=${encodeURIComponent(
+    const searchUrl = `${zohoUrl('Accounts/search')}?criteria=${encodeURIComponent(
       criteria
     )}`;
     const searchRes = await axios.get(searchUrl, { headers });
@@ -33,12 +31,12 @@ export async function createOrUpdateZohoAccount(accountData) {
       searchRes.data.data.length > 0
     ) {
       const existingId = searchRes.data.data[0].id;
-      const updateUrl = `${process.env.ZOHO_API_BASE}/Accounts/${existingId}`;
+      const updateUrl = zohoUrl(`Accounts/${existingId}`);
       const updatePayload = { data: [{ ...accountData }] };
       const updateRes = await axios.put(updateUrl, updatePayload, { headers });
       return { status: 'updated', id: existingId, result: updateRes.data };
     } else {
-      const createUrl = `${process.env.ZOHO_API_BASE}/Accounts`;
+      const createUrl = zohoUrl('Accounts');
       const createRes = await axios.post(createUrl, payload, { headers });
       const newId = createRes.data.data[0].details.id;
       return { status: 'created', id: newId, result: createRes.data };
@@ -55,7 +53,7 @@ export async function createOrUpdateZohoAccount(accountData) {
 export async function findAccountByCustomerId(customerId) {
   try {
     const criteria = `(PrintIQ_Customer_ID:equals:${customerId})`;
-    const searchUrl = `${process.env.ZOHO_API_BASE}/Accounts/search?criteria=${encodeURIComponent(
+    const searchUrl = `${zohoUrl('Accounts/search')}?criteria=${encodeURIComponent(
       criteria
     )}`;
     const response = await axios.get(searchUrl, { headers });
@@ -75,7 +73,7 @@ export async function findAccountByCustomerId(customerId) {
 }
 
 export async function updateAccountAddressSubform(accountId, address) {
-  const updateUrl = `${process.env.ZOHO_API_BASE}/Accounts/${accountId}`;
+  const updateUrl = zohoUrl(`Accounts/${accountId}`);
   const subformEntry = {
     Address_Line_1: address.AddressLine1,
     Address_Line_2: address.AddressLine2 || '',
