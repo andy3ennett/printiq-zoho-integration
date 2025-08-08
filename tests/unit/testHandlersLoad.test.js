@@ -7,6 +7,14 @@ vi.mock('../../sync/clients/zohoClient.js', () => ({
   createOrUpdateContact: vi.fn().mockResolvedValue({}),
   createOrUpdateAddress: vi.fn().mockResolvedValue({}),
 }));
+vi.mock('../../src/queues/zohoQueue.js', () => ({
+  addZohoJob: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../../src/services/idempotency.js', () => ({
+  setIfNotExists: vi.fn().mockResolvedValue(true),
+  buildKey: vi.fn(() => 'key'),
+  hashPayload: vi.fn(() => 'hash'),
+}));
 import { processPrintIQCustomerWebhook } from '../../sync/handlers/processPrintIQCustomerWebhook';
 import { processPrintIQContactWebhook } from '../../sync/handlers/processPrintIQContactWebhook';
 import { processPrintIQAddressWebhook } from '../../sync/handlers/processPrintIQAddressWebhook';
@@ -14,8 +22,10 @@ import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
 
 describe('Handler Modules Load and Execute', () => {
   test('should load and run customer handler without error', async () => {
+    const req = { body: { ID: '1', Name: 'Test Co.' }, headers: {} };
+    const res = { status: vi.fn().mockReturnThis(), send: vi.fn() };
     await expect(
-      processPrintIQCustomerWebhook({ ID: 1, Name: 'Test Co.' })
+      processPrintIQCustomerWebhook(req, res)
     ).resolves.not.toThrow();
   });
 
