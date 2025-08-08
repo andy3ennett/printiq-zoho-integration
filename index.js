@@ -19,6 +19,17 @@ const app = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
 
+// Basic health and readiness endpoints
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ ok: true, ts: new Date().toISOString() });
+});
+
+app.get('/readyz', (req, res) => {
+  // If your Token Doctor sets some in-memory status, surface it here.
+  // For now, just reflect that the app is running; we’ll wire real checks after re-auth.
+  res.status(200).json({ ready: true, ts: new Date().toISOString() });
+});
+
 app.get('/auth', (req, res) => {
   const authUrl = `${zohoAccountsUrl('/oauth/v2/auth')}?scope=ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.READ&client_id=${process.env.ZOHO_CLIENT_ID}&response_type=code&access_type=offline&prompt=consent&redirect_uri=${process.env.ZOHO_REDIRECT_URI}`;
   res.redirect(authUrl);
@@ -193,6 +204,20 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
       message: 'One or more checks failed',
       error: err.message,
     });
+  }
+});
+
+app.get('/readyz', async (req, res) => {
+  try {
+    // replace with your real check; e.g., await ensureAccessToken()
+    await tokenDoctor.check(); // or ensureAccessToken()
+    const meta =
+      process.env.NODE_ENV !== 'production'
+        ? { ts: new Date().toISOString() }
+        : {};
+    res.status(200).json({ ready: true, ...meta });
+  } catch (e) {
+    res.status(503).json({ ready: false });
   }
 });
 
