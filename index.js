@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { zohoAccountsUrl, zohoUrl, env } from './src/config/env.js';
 import express from 'express';
 import fs from 'fs';
 import os from 'os';
@@ -6,10 +7,11 @@ import path from 'path';
 import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { loggingMiddleware } from './src/middleware/logging.js';
+import { logger } from './src/utils/logger.js';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
-import { zohoAccountsUrl, zohoUrl, env } from './src/config/env.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,15 +21,29 @@ const app = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
 
+app.use(loggingMiddleware);
+
 // Basic health and readiness endpoints
 app.get('/healthz', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
 
-app.get('/readyz', (req, res) => {
-  // If your Token Doctor sets some in-memory status, surface it here.
-  // For now, just reflect that the app is running; we’ll wire real checks after re-auth.
-  res.status(200).json({ ready: true, ts: new Date().toISOString() });
+app.get('/readyz', async (req, res) => {
+  try {
+    // Replace this with your real check if named differently:
+    if (typeof ensureAccessToken === 'function') {
+      await ensureAccessToken();
+    }
+    // Don’t leak env in production
+    const meta =
+      process.env.NODE_ENV !== 'production'
+        ? { ts: new Date().toISOString() }
+        : {};
+    res.status(200).json({ ready: true, ...meta });
+  } catch (e) {
+    logger.warn({ err: e?.message || String(e) }, 'readyz: token check failed');
+    res.status(503).json({ ready: false });
+  }
 });
 
 app.get('/auth', (req, res) => {

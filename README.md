@@ -82,6 +82,16 @@ node tests/testAddressWebhook.js
 
 ---
 
+## Logging
+
+We use `pino` with a request ID and PII redaction (emails, phone numbers, long numeric IDs).
+Each request is logged with method, path, status, duration, and `req.id`.
+
+Example:
+{"level":"info","msg":"GET /webhooks/printiq -> 200 in 12ms","requestId":"b1a8...","status":200}
+
+---
+
 ## 📄 Documentation
 
 To follow.
