@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { loggingMiddleware } from './src/middleware/logging.js';
 import { logger } from './src/utils/logger.js';
+import { redis } from './src/services/idempotency.js';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
@@ -30,18 +31,15 @@ app.get('/healthz', (req, res) => {
 
 app.get('/readyz', async (req, res) => {
   try {
-    // Replace this with your real check if named differently:
-    if (typeof ensureAccessToken === 'function') {
-      await ensureAccessToken();
-    }
-    // Don’t leak env in production
+    await getValidAccessToken();
+    await redis.ping();
     const meta =
       process.env.NODE_ENV !== 'production'
         ? { ts: new Date().toISOString() }
         : {};
     res.status(200).json({ ready: true, ...meta });
   } catch (e) {
-    logger.warn({ err: e?.message || String(e) }, 'readyz: token check failed');
+    logger.warn({ err: e?.message || String(e) }, 'readyz failed');
     res.status(503).json({ ready: false });
   }
 });
@@ -220,20 +218,6 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
       message: 'One or more checks failed',
       error: err.message,
     });
-  }
-});
-
-app.get('/readyz', async (req, res) => {
-  try {
-    // replace with your real check; e.g., await ensureAccessToken()
-    await tokenDoctor.check(); // or ensureAccessToken()
-    const meta =
-      process.env.NODE_ENV !== 'production'
-        ? { ts: new Date().toISOString() }
-        : {};
-    res.status(200).json({ ready: true, ...meta });
-  } catch (e) {
-    res.status(503).json({ ready: false });
   }
 });
 
