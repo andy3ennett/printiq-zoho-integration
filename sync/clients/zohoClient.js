@@ -4,12 +4,8 @@
  * Lookup a Deal in Zoho CRM by Quote ID (custom field).
  */
 import axios from 'axios';
-import dotenv from 'dotenv';
 import syncLogger from '../../logs/syncLogger.js';
-
-dotenv.config();
-
-const ZOHO_BASE = process.env.ZOHO_API_BASE_URL;
+import { zohoUrl } from '../../src/config/env.js';
 
 async function getAccessToken() {
   // Placeholder: Replace this with real token manager
@@ -23,7 +19,7 @@ export async function findDealByQuoteId(quoteId) {
   try {
     const token = await getAccessToken();
     const criteria = `(PrintIQ_Quote_ID:equals:${quoteId})`;
-    const response = await axios.get(`${ZOHO_BASE}/Deals/search`, {
+    const response = await axios.get(zohoUrl('Deals/search'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       params: { criteria },
     });
@@ -68,7 +64,7 @@ export async function updateDealStageByQuoteId(quoteId, newStage) {
   try {
     const token = await getAccessToken();
     const response = await axios.put(
-      `${ZOHO_BASE}/Deals`,
+      zohoUrl('Deals'),
       {
         data: [
           {
@@ -108,7 +104,7 @@ export async function attachInvoiceToDeal(quoteId, invoiceData) {
   try {
     const token = await getAccessToken();
     const response = await axios.put(
-      `${ZOHO_BASE}/Deals`,
+      zohoUrl('Deals'),
       {
         data: [
           {
@@ -143,7 +139,7 @@ export async function createOrUpdateCustomer(customerData) {
   const token = await getAccessToken();
 
   try {
-    const searchRes = await axios.get(`${ZOHO_BASE}/Accounts/search`, {
+    const searchRes = await axios.get(zohoUrl('Accounts/search'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       params: {
         criteria: `(PrintIQ_Customer_ID:equals:${customerData.PrintIQ_Customer_ID})`,
@@ -160,7 +156,7 @@ export async function createOrUpdateCustomer(customerData) {
       payload.data[0].id = match.id;
     }
 
-    const res = await axios.post(`${ZOHO_BASE}/Accounts/upsert`, payload, {
+    const res = await axios.post(zohoUrl('Accounts/upsert'), payload, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -185,7 +181,7 @@ export async function createOrUpdateContact(contactData) {
   const token = await getAccessToken();
 
   try {
-    const searchRes = await axios.get(`${ZOHO_BASE}/Contacts/search`, {
+    const searchRes = await axios.get(zohoUrl('Contacts/search'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       params: {
         criteria: `(PrintIQ_Contact_ID:equals:${contactData.PrintIQ_Contact_ID})`,
@@ -202,7 +198,7 @@ export async function createOrUpdateContact(contactData) {
       payload.data[0].id = match.id;
     }
 
-    const res = await axios.post(`${ZOHO_BASE}/Contacts/upsert`, payload, {
+    const res = await axios.post(zohoUrl('Contacts/upsert'), payload, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -228,7 +224,7 @@ export async function createOrUpdateAddress(addressData) {
   const token = await getAccessToken();
 
   try {
-    const searchRes = await axios.get(`${ZOHO_BASE}/Addresses/search`, {
+    const searchRes = await axios.get(zohoUrl('Addresses/search'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       params: {
         criteria: `(PrintIQ_Address_ID:equals:${addressData.PrintIQ_Address_ID})`,
@@ -245,7 +241,7 @@ export async function createOrUpdateAddress(addressData) {
       payload.data[0].id = match.id;
     }
 
-    const res = await axios.post(`${ZOHO_BASE}/Addresses/upsert`, payload, {
+    const res = await axios.post(zohoUrl('Addresses/upsert'), payload, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 

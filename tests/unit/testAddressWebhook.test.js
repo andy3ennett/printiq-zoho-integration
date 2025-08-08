@@ -1,15 +1,14 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
+vi.mock('../../sync/auth/tokenManager.js', () => ({
+  getValidAccessToken: vi.fn().mockResolvedValue('token'),
+}));
+vi.mock('../../sync/clients/zohoClient.js', () => ({
+  createOrUpdateAddress: vi.fn().mockResolvedValue({}),
+}));
 import { processPrintIQAddressWebhook } from '../../sync/handlers/processPrintIQAddressWebhook.js';
-import * as tokenManager from '../../sync/auth/tokenManager.js';
 
 describe('processPrintIQAddressWebhook', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
   test('should process address webhook successfully', async () => {
-    vi.spyOn(tokenManager, 'refreshAccessToken').mockResolvedValue();
-
     const testPayload = {
       PrintIQ_Customer_ID: 14357,
       Address: {

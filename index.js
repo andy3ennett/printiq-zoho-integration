@@ -9,6 +9,7 @@ import { dirname } from 'path';
 
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
+import { zohoAccountsUrl, zohoUrl, env } from './src/config/env.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,7 +20,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/auth', (req, res) => {
-  const authUrl = `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/auth?scope=ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.READ&client_id=${process.env.ZOHO_CLIENT_ID}&response_type=code&access_type=offline&prompt=consent&redirect_uri=${process.env.ZOHO_REDIRECT_URI}`;
+  const authUrl = `${zohoAccountsUrl('/oauth/v2/auth')}?scope=ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.READ&client_id=${process.env.ZOHO_CLIENT_ID}&response_type=code&access_type=offline&prompt=consent&redirect_uri=${process.env.ZOHO_REDIRECT_URI}`;
   res.redirect(authUrl);
 });
 
@@ -29,7 +30,7 @@ app.get('/oauth/callback', async (req, res) => {
 
   try {
     const response = await axios.post(
-      `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/token`,
+      zohoAccountsUrl('/oauth/v2/token'),
       null,
       {
         params: {
@@ -66,12 +67,9 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/health-check', async (req, res) => {
   try {
     const token = await getValidAccessToken();
-    const response = await axios.get(
-      `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
-      {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      }
-    );
+    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    });
 
     const user = response.data.users[0];
     res.json({
@@ -83,7 +81,7 @@ app.get('/health-check', async (req, res) => {
         role: user.role.name,
         id: user.id,
       },
-      api_base: process.env.ZOHO_API_BASE,
+      api_base: env.ZOHO_BASE_URL,
       token_expires_in_seconds: Math.round(
         (user.expires_in - Date.now()) / 1000
       ),
@@ -146,10 +144,9 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
   try {
     const token = await getValidAccessToken();
 
-    const crmRes = await axios.get(
-      `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
-      { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
-    );
+    const crmRes = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    });
 
     const user = crmRes.data.users[0];
     const files = fs
@@ -183,7 +180,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
           role: user.role.name,
           id: user.id,
         },
-        apiBase: process.env.ZOHO_API_BASE,
+        apiBase: env.ZOHO_BASE_URL,
       },
       recentLogs: files
         .sort((a, b) => b.lastModified.localeCompare(a.lastModified))

@@ -1,10 +1,8 @@
 import fs from 'fs';
 import axios from 'axios';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-dotenv.config();
+import { zohoAccountsUrl, zohoUrl } from '../../src/config/env.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN_FILE = path.join(__dirname, '../../token.json');
 let tokens = {};
@@ -21,7 +19,7 @@ export async function refreshAccessToken() {
   console.log('🔄 Refreshing Zoho access token...');
   try {
     const response = await axios.post(
-      `${process.env.ZOHO_ACCOUNTS_URL}/oauth/v2/token`,
+      zohoAccountsUrl('/oauth/v2/token'),
       null,
       {
         params: {
@@ -67,12 +65,9 @@ export async function tokenDoctor() {
   const token = await getValidAccessToken();
 
   try {
-    const response = await axios.get(
-      `${process.env.ZOHO_API_BASE}/users?type=CurrentUser`,
-      {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      }
-    );
+    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    });
 
     const user = response.data.users[0];
     console.log(
