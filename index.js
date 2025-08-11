@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { zohoAccountsUrl, zohoUrl, env } from './src/config/env.js';
+import { zohoAccountsUrl, zohoUrl, env, crmUrl } from './src/config/env.js';
 import express from 'express';
 import fs from 'fs';
 import os from 'os';
@@ -9,10 +9,16 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { loggingMiddleware } from './src/middleware/logging.js';
 import { logger } from './src/utils/logger.js';
-
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
+import { printiqCustomerRouter } from './sync/handlers/processPrintIQCustomerWebhook.js';
+import IORedis from 'ioredis';
+
+const redis = new IORedis(env.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: true,
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,28 +28,11 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 app.use(loggingMiddleware);
+app.use(printiqCustomerRouter);
 
 // Basic health and readiness endpoints
 app.get('/healthz', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
-});
-
-app.get('/readyz', async (req, res) => {
-  try {
-    // Replace this with your real check if named differently:
-    if (typeof ensureAccessToken === 'function') {
-      await ensureAccessToken();
-    }
-    // Don’t leak env in production
-    const meta =
-      process.env.NODE_ENV !== 'production'
-        ? { ts: new Date().toISOString() }
-        : {};
-    res.status(200).json({ ready: true, ...meta });
-  } catch (e) {
-    logger.warn({ err: e?.message || String(e) }, 'readyz: token check failed');
-    res.status(503).json({ ready: false });
-  }
 });
 
 app.get('/auth', (req, res) => {
@@ -94,7 +83,7 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/health-check', async (req, res) => {
   try {
     const token = await getValidAccessToken();
-    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+    const response = await axios.get(crmUrl('/users?type=CurrentUser'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -114,7 +103,7 @@ app.get('/health-check', async (req, res) => {
       ),
     });
   } catch (err) {
-    console.error('Health check failed:', err.message);
+    logger.error({ err: err?.message }, 'Health check failed');
     res.status(500).json({
       status: 'FAIL',
       message: 'Failed to connect to Zoho CRM',
@@ -156,7 +145,7 @@ app.get('/health/logs', (req, res) => {
         .slice(0, 5),
     });
   } catch (err) {
-    console.error('Health check log error:', err.message);
+    logger.error({ err: err?.message }, 'Health logs read error');
     res.status(500).json({
       status: 'FAIL',
       message: 'Unable to read log directory',
@@ -171,7 +160,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
   try {
     const token = await getValidAccessToken();
 
-    const crmRes = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+    const crmRes = await axios.get(crmUrl('/users?type=CurrentUser'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -214,7 +203,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
         .slice(0, 5),
     });
   } catch (err) {
-    console.error('Health check failure:', err.message);
+    logger.error({ err: err?.message }, 'Health check failure');
     res.status(500).json({
       status: 'FAIL',
       message: 'One or more checks failed',
@@ -225,26 +214,28 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
 
 app.get('/readyz', async (req, res) => {
   try {
-    // replace with your real check; e.g., await ensureAccessToken()
-    await tokenDoctor.check(); // or ensureAccessToken()
+    // External deps must be healthy: Redis + Zoho token access
+    await redis.ping();
+    await getValidAccessToken();
+
     const meta =
       process.env.NODE_ENV !== 'production'
         ? { ts: new Date().toISOString() }
         : {};
-    res.status(200).json({ ready: true, ...meta });
+    return res.status(200).json({ ready: true, ...meta });
   } catch (e) {
-    res.status(503).json({ ready: false });
+    return res.status(503).json({ ready: false });
   }
 });
 
 app.use('/webhooks/printiq', printiqWebhooks);
 
 app.listen(port, async () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+  logger.info({ port }, 'Server running');
   try {
     await tokenDoctor();
-    console.log('✅ Token Doctor: All green! Ready to sync.');
+    logger.info('Token Doctor: All green! Ready to sync.');
   } catch (err) {
-    console.error('🛑 Token Doctor found an issue at startup:', err.message);
+    logger.error({ err: err?.message }, 'Token Doctor issue at startup');
   }
 });

@@ -1,7 +1,47 @@
+import express from 'express';
 import { createOrUpdateCustomer } from '../clients/zohoClient.js';
 import { getValidAccessToken } from '../auth/tokenManager.js';
 import syncLogger from '../../logs/syncLogger.js';
 
+import { setOnce } from '../services/idempotency.js';
+import { enqueueCustomerUpsert } from '../queues/zohoQueue.js';
+
+// Export an Express Router instead of referencing a global `app`
+export const printiqCustomerRouter = express.Router();
+
+// NOTE: Ensure `app.use(express.json())` is called in index.js before mounting this router.
+printiqCustomerRouter.post('/webhooks/printiq/customer', async (req, res) => {
+  try {
+    const {
+      event = 'customer.updated',
+      id: eventId,
+      printiqCustomerId,
+      ...rest
+    } = req.body || {};
+    const key = `printiq:${event}:${eventId || printiqCustomerId || 'unknown'}`;
+
+    const first = await setOnce(key, 1800); // 30 minutes TTL
+    if (!first) {
+      syncLogger?.info?.(`🔁 Duplicate customer event suppressed: ${key}`);
+      return res.status(202).json({ deduped: true });
+    }
+
+    await enqueueCustomerUpsert({
+      printiqCustomerId,
+      ...rest,
+      requestId: req.id,
+    });
+
+    return res.status(202).json({ queued: true });
+  } catch (err) {
+    syncLogger?.error?.(
+      `❌ Failed to enqueue customer upsert: ${err?.message || err}`
+    );
+    return res.status(500).json({ error: 'enqueue_failed' });
+  }
+});
+
+// Legacy processor kept for compatibility with existing tests/flows.
 export async function processPrintIQCustomerWebhook(payload) {
   try {
     await getValidAccessToken();
@@ -44,6 +84,7 @@ export async function processPrintIQCustomerWebhook(payload) {
       Billing_Code: Postcode || '',
       Billing_Country: Country || '',
     };
+
     await createOrUpdateCustomer(zohoPayload);
     syncLogger.success(`✅ Synced customer in Zoho CRM: ${Name}`);
   } catch (err) {
