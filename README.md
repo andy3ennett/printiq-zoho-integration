@@ -56,7 +56,7 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
    ZOHO_CLIENT_SECRET=your_client_secret
    ZOHO_REDIRECT_URI=http://localhost:3000/oauth/callback
    ZOHO_ACCOUNTS_URL=https://accounts.zoho.com
-   ZOHO_BASE_URL=https://www.zohoapis.com/crm/v2
+   ZOHO_BASE_URL=https://www.zohoapis.com
    PORT=3000
    HEALTH_TOKEN=your_token_for_protected_health_routes
    ```
@@ -79,6 +79,25 @@ Or test individual handlers via:
 ```bash
 node tests/testAddressWebhook.js
 ```
+
+## 🔩 Zoho Configuration
+
+- Add a custom field on **Accounts** named `PrintIQ_Customer_ID` and set it as the external ID.
+- Minimal field mapping:
+
+  | PrintIQ field       | Zoho Account field    |
+  | ------------------- | --------------------- |
+  | `printiqCustomerId` | `PrintIQ_Customer_ID` |
+  | `name`              | `Account_Name`        |
+
+## 🔥 Smoke Test & Monitoring
+
+- Start API and worker: `npm run dev:all`
+- Run end-to-end smoke test: `npm run smoke:e2e`
+- DLQ management:
+  - `npm run dlq:list`
+  - `npm run dlq:retry`
+- Metrics available at `http://localhost:3000/metrics`
 
 ---
 

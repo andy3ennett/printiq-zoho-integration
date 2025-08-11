@@ -2,7 +2,8 @@ import fs from 'fs';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { zohoAccountsUrl, crmUrl } from '../../src/config/env.js';
+import { zohoAccountsUrl } from '../../src/config/env.js';
+import { getCurrentUser } from '../../src/zoho/client.js';
 import { logger } from '../../src/utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN_FILE = path.join(__dirname, '../../token.json');
@@ -66,11 +67,7 @@ export async function tokenDoctor() {
   const token = await getValidAccessToken();
 
   try {
-    const response = await axios.get(crmUrl('/users?type=CurrentUser'), {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
-
-    const user = response.data.users[0];
+    const user = await getCurrentUser(token);
     logger.info(
       { user: { name: user.full_name, email: user.email } },
       '✅ CRM Access OK'

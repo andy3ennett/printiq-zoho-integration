@@ -11,7 +11,7 @@ vi.mock('../../src/services/idempotency.js', () => ({
 
 const addZohoJobMock = vi.fn(async () => ({ id: 'job-123' }));
 vi.mock('../../src/queues/zohoQueue.js', () => ({
-  addZohoJob: (...args) => addZohoJobMock(...args),
+  enqueueCustomerUpsert: (...args) => addZohoJobMock(...args),
 }));
 
 import printiqWebhooks from '../../sync/routes/printiqWebhooks.js';
@@ -32,8 +32,9 @@ describe('Customer webhook → idempotency + enqueue', () => {
   it('queues on first event and dedupes on repeat', async () => {
     const app = makeApp();
     const body = {
-      ID: 'evt_1',
-      Name: 'Acme Ltd',
+      id: 'evt_1',
+      printiqCustomerId: 123,
+      name: 'Acme Ltd',
     };
 
     setIfNotExistsMock.mockResolvedValueOnce(true);
@@ -42,6 +43,7 @@ describe('Customer webhook → idempotency + enqueue', () => {
       .set('content-type', 'application/json')
       .send(body);
     expect(res1.status).toBe(202);
+    expect(res1.body.queued).toBe(true);
     expect(addZohoJobMock).toHaveBeenCalledTimes(1);
 
     setIfNotExistsMock.mockResolvedValueOnce(false);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { addZohoJob } from '../../src/queues/zohoQueue.js';
+import { enqueueCustomerUpsert } from '../../src/queues/zohoQueue.js';
 import {
   setIfNotExists,
   buildKey,
@@ -9,25 +9,16 @@ import { logger } from '../../src/utils/logger.js';
 import { v4 as uuid } from 'uuid';
 
 const payloadSchema = z.object({
-  ID: z.coerce.string().optional(),
-  Name: z.string(),
-  Phone: z.string().optional(),
-  Website: z.string().optional(),
-  Code: z.string().optional(),
-  Email: z.string().optional(),
-  Fax: z.string().optional(),
-  Comment: z.string().optional(),
-  Active: z.string().optional(),
-  AddressLine1: z.string().optional(),
-  City: z.string().optional(),
-  State: z.string().optional(),
-  Postcode: z.string().optional(),
-  Country: z.string().optional(),
+  id: z.string().optional(),
+  event: z.string().optional(),
+  printiqCustomerId: z.union([z.string(), z.number()]),
+  name: z.string(),
+  forceFail: z.boolean().optional(),
 });
 
 export async function processPrintIQCustomerWebhook(req, res) {
   const parsed = payloadSchema.parse(req.body || {});
-  const eventId = parsed.ID || hashPayload(parsed);
+  const eventId = parsed.id || hashPayload(parsed);
   const key = buildKey('customer', eventId);
   const isNew = await setIfNotExists(key, 30 * 60);
   if (!isNew) {
@@ -37,10 +28,9 @@ export async function processPrintIQCustomerWebhook(req, res) {
 
   const jobPayload = {
     requestId: req.headers['x-request-id'] || uuid(),
-    source: 'printiq',
-    payload: parsed,
+    ...parsed,
   };
 
-  await addZohoJob('customer.upsert', jobPayload);
-  res.status(202).send('Accepted');
+  await enqueueCustomerUpsert(jobPayload);
+  res.status(202).json({ queued: true });
 }
