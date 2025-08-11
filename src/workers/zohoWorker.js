@@ -1,81 +1,75 @@
-import { Worker, Queue } from 'bullmq';
-import { connection, ZOHO_QUEUE_NAME } from '../queues/zohoQueue.js';
-import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
+// src/workers/zohoWorker.js
+import pkg from 'bullmq';
+import IORedis from 'ioredis';
+import { env } from '../config/env.js';
+import { logger } from '../middleware/logging.js';
 import {
-  searchAccountsByExternalId,
-  createAccount,
-  updateAccount,
+  upsertZohoAccountByExternalId,
   NonRetryableError,
 } from '../zoho/client.js';
-import { toZohoAccount } from '../mappings/customer.js';
-import { logger, redactPII } from '../utils/logger.js';
+import { mapPrintIQCustomerToZohoAccount } from '../mappings/customer.js';
 
-export function backoffStrategy(attemptsMade) {
-  const base = 1000 * Math.pow(2, attemptsMade);
-  const jitter = Math.floor(Math.random() * 1000);
-  return base + jitter;
-}
+const { Worker } = pkg;
 
-export async function processor(job) {
-  const start = Date.now();
-  const { requestId, printiqCustomerId, name, forceFail } = job.data;
-  const extId = String(printiqCustomerId);
+const connection = new IORedis(env.REDIS_URL, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: true,
+});
+
+async function processor(job) {
+  const { name, data, id: jobId, attemptsMade } = job;
+  const { printiqCustomerId, forceFail } = data || {};
+
+  logger.info(
+    { jobId, name, attemptsMade, printiqCustomerId },
+    'worker received job'
+  );
+
+  // Deterministic failure path for exercising DLQ in non-prod
+  if (forceFail && env.NODE_ENV !== 'production') {
+    throw new Error('Forced failure for test (non-prod)');
+  }
 
   try {
-    if (forceFail && process.env.NODE_ENV !== 'production') {
-      throw new NonRetryableError('Forced failure');
-    }
+    // Fetch/construct mapped payload for Zoho
+    const account = await mapPrintIQCustomerToZohoAccount(printiqCustomerId);
+    const res = await upsertZohoAccountByExternalId(printiqCustomerId, account);
 
-    const token = await getValidAccessToken();
-    const body = toZohoAccount({ printiqCustomerId: extId, name });
-
-    const found = await searchAccountsByExternalId(token, extId);
-    let path = 'create';
-    let zohoId;
-    if (found) {
-      path = 'update';
-      zohoId = found.id;
-      await updateAccount(token, zohoId, body);
-    } else {
-      const created = await createAccount(token, body);
-      zohoId = created?.details?.id || created?.id;
-    }
-
-    const duration = Date.now() - start;
     logger.info(
-      { requestId, jobId: job.id, extId, path, zohoId, duration },
-      'job customer.upsert success'
+      { jobId, printiqCustomerId, zohoId: res?.id },
+      'customer upserted'
     );
-    return { zohoId, path };
+    return { ok: true, zohoId: res?.id };
   } catch (err) {
-    const duration = Date.now() - start;
-    logger.error(
-      { requestId, jobId: job.id, extId, err: err?.message, duration },
-      'job customer.upsert error'
-    );
+    // If the client marked this as non-retryable, mark as failed permanently
     if (err instanceof NonRetryableError) {
-      job.discard();
+      logger.warn(
+        { jobId, printiqCustomerId, reason: err.message },
+        'non-retryable job; discarding'
+      );
+      // letting it throw will mark failed; BullMQ will not retry when attempts exhausted; for hard stop:
+      // return without throwing to mark completed-but-unsuccessful; we prefer fail:
+      throw err;
     }
+
+    logger.error(
+      { jobId, printiqCustomerId, err: err?.message },
+      'retryable error in worker'
+    );
+    // Throw to let BullMQ retry according to attempts/backoff
     throw err;
   }
 }
 
-export const worker = new Worker(ZOHO_QUEUE_NAME, processor, {
+export const zohoWorker = new Worker('zoho', processor, {
   connection,
-  concurrency: 5,
-  settings: {
-    backoffStrategy,
-  },
+  concurrency: Number(env.WORKER_CONCURRENCY || 5),
 });
 
-worker.on('failed', async (job, err) => {
-  if (job.attemptsMade >= (job.opts.attempts || 1)) {
-    const deadQueue = new Queue(`${job.queueName}:dead`, { connection });
-    const preview = redactPII(JSON.stringify(job.data).slice(0, 200));
-    logger.error(
-      { jobId: job.id, err: err?.message, payload: preview },
-      'job moved to DLQ'
-    );
-    await deadQueue.add(job.name, job.data);
-  }
-});
+zohoWorker.on('ready', () => logger.info('zohoWorker ready'));
+zohoWorker.on('failed', (job, err) =>
+  logger.error({ jobId: job?.id, err: err?.message }, 'job failed')
+);
+zohoWorker.on('completed', job =>
+  logger.info({ jobId: job?.id }, 'job completed')
+);
