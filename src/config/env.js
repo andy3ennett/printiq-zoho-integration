@@ -8,6 +8,14 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 
+// Ensure path segments start with a single leading slash.
+// normalize('users') -> '/users' ; normalize('/users') -> '/users' ; normalize('') -> '/'
+const normalize = (p = '') => {
+  const s = String(p ?? '');
+  if (s === '' || s === '/') return '/';
+  return s.startsWith('/') ? s : `/${s}`;
+};
+
 const trim = str => str.replace(/\/$/, '');
 const strip = str => str.replace(/^\//, '');
 
