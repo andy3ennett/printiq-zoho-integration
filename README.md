@@ -61,28 +61,10 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
    HEALTH_TOKEN=your_token_for_protected_health_routes
    ```
 
-4. **Authenticate with Zoho**
-   Start the server and visit:
-   `http://localhost:3000/auth`
+4. **Authenticate with Zoho**  
+   Start the server and visit:  
+   `http://localhost:3000/auth`  
    Follow the OAuth flow to generate and store your access token.
-
----
-
-## Queues & Retries
-
-This project uses **BullMQ** with Redis to process webhook events asynchronously.
-
-### Local development
-
-```bash
-docker compose up -d redis
-npm run dev:all
-```
-
-The `dev:all` script starts the API and worker together. Webhook handlers enqueue jobs to the `zoho` queue and return `202 Accepted` immediately.
-
-- Idempotency keys: `printiq:{eventType}:{eventId}` with a 30 minute TTL.
-- Retry policy: up to 5 attempts with exponential backoff and jitter. Failed jobs are moved to a dead-letter queue.
 
 ---
 

@@ -1,11 +1,14 @@
-import IORedis from 'ioredis';
 import crypto from 'crypto';
+import IORedis from 'ioredis';
 import { env } from '../config/env.js';
 
 export const redis =
   process.env.NODE_ENV === 'test'
     ? { set: async () => 'OK', ping: async () => 'PONG' }
-    : new IORedis(env.REDIS_URL);
+    : new IORedis(env.REDIS_URL, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: true,
+      });
 
 export async function setIfNotExists(key, ttlSecs, client = redis) {
   const res = await client.set(key, '1', 'EX', ttlSecs, 'NX');

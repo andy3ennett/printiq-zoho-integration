@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { zohoAccountsUrl, zohoUrl, env } from './src/config/env.js';
+import { zohoAccountsUrl, env, crmUrl } from './src/config/env.js';
 import express from 'express';
 import fs from 'fs';
 import os from 'os';
@@ -10,10 +10,90 @@ import { dirname } from 'path';
 import { loggingMiddleware } from './src/middleware/logging.js';
 import { logger } from './src/utils/logger.js';
 import { redis } from './src/services/idempotency.js';
-
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
+import client from 'prom-client';
+import { zohoQueue } from './src/queues/zohoQueue.js';
+
+// Metrics setup
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status'],
+});
+const httpRequestDurationSeconds = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status'],
+  buckets: [0.05, 0.1, 0.3, 0.5, 1, 2, 5],
+});
+register.registerMetric(httpRequestsTotal);
+register.registerMetric(httpRequestDurationSeconds);
+
+const queueWaiting = new client.Gauge({
+  name: 'bullmq_waiting',
+  help: 'Waiting jobs',
+});
+const queueActive = new client.Gauge({
+  name: 'bullmq_active',
+  help: 'Active jobs',
+});
+const queueDelayed = new client.Gauge({
+  name: 'bullmq_delayed',
+  help: 'Delayed jobs',
+});
+const queueFailed = new client.Gauge({
+  name: 'bullmq_failed',
+  help: 'Failed jobs',
+});
+const queueCompleted = new client.Gauge({
+  name: 'bullmq_completed',
+  help: 'Completed jobs',
+});
+[queueWaiting, queueActive, queueDelayed, queueFailed, queueCompleted].forEach(
+  m => register.registerMetric(m)
+);
+
+function metricsMiddleware(req, res, next) {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const dur = Number(process.hrtime.bigint() - start) / 1e9;
+    const labels = {
+      method: req.method,
+      route: req.route?.path || req.path || 'unknown',
+      status: String(res.statusCode),
+    };
+    httpRequestsTotal.inc(labels);
+    httpRequestDurationSeconds.observe(labels, dur);
+  });
+  next();
+}
+
+async function metricsHandler(_req, res) {
+  try {
+    const [w, a, d, f, c] = await Promise.all([
+      zohoQueue.getWaitingCount(),
+      zohoQueue.getActiveCount(),
+      zohoQueue.getDelayedCount(),
+      zohoQueue.getFailedCount(),
+      zohoQueue.getCompletedCount(),
+    ]);
+    queueWaiting.set(w);
+    queueActive.set(a);
+    queueDelayed.set(d);
+    queueFailed.set(f);
+    queueCompleted.set(c);
+
+    res.setHeader('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,8 +103,10 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 app.use(loggingMiddleware);
+app.use(metricsMiddleware);
 
 // Basic health and readiness endpoints
+app.get('/metrics', metricsHandler);
 app.get('/healthz', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
@@ -43,7 +125,6 @@ app.get('/readyz', async (req, res) => {
     res.status(503).json({ ready: false });
   }
 });
-
 app.get('/auth', (req, res) => {
   const authUrl = `${zohoAccountsUrl('/oauth/v2/auth')}?scope=ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.users.READ&client_id=${process.env.ZOHO_CLIENT_ID}&response_type=code&access_type=offline&prompt=consent&redirect_uri=${process.env.ZOHO_REDIRECT_URI}`;
   res.redirect(authUrl);
@@ -92,7 +173,7 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/health-check', async (req, res) => {
   try {
     const token = await getValidAccessToken();
-    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+    const response = await axios.get(crmUrl('/users?type=CurrentUser'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -112,7 +193,7 @@ app.get('/health-check', async (req, res) => {
       ),
     });
   } catch (err) {
-    console.error('Health check failed:', err.message);
+    logger.error({ err: err?.message }, 'Health check failed');
     res.status(500).json({
       status: 'FAIL',
       message: 'Failed to connect to Zoho CRM',
@@ -154,7 +235,7 @@ app.get('/health/logs', (req, res) => {
         .slice(0, 5),
     });
   } catch (err) {
-    console.error('Health check log error:', err.message);
+    logger.error({ err: err?.message }, 'Health logs read error');
     res.status(500).json({
       status: 'FAIL',
       message: 'Unable to read log directory',
@@ -169,7 +250,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
   try {
     const token = await getValidAccessToken();
 
-    const crmRes = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+    const crmRes = await axios.get(crmUrl('/users?type=CurrentUser'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
@@ -212,7 +293,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
         .slice(0, 5),
     });
   } catch (err) {
-    console.error('Health check failure:', err.message);
+    logger.error({ err: err?.message }, 'Health check failure');
     res.status(500).json({
       status: 'FAIL',
       message: 'One or more checks failed',
@@ -224,11 +305,11 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
 app.use('/webhooks/printiq', printiqWebhooks);
 
 app.listen(port, async () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+  logger.info({ port }, 'Server running');
   try {
     await tokenDoctor();
-    console.log('✅ Token Doctor: All green! Ready to sync.');
+    logger.info('Token Doctor: All green! Ready to sync.');
   } catch (err) {
-    console.error('🛑 Token Doctor found an issue at startup:', err.message);
+    logger.error({ err: err?.message }, 'Token Doctor issue at startup');
   }
 });

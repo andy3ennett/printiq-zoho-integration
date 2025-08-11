@@ -6,7 +6,10 @@ let connection;
 if (process.env.NODE_ENV === 'test') {
   connection = { options: {} };
 } else {
-  connection = new IORedis(env.REDIS_URL);
+  connection = new IORedis(env.REDIS_URL, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+  });
   connection.options = connection.options || {};
 }
 export { connection };
@@ -17,6 +20,8 @@ export const zohoQueue = new Queue(ZOHO_QUEUE_NAME, {
   defaultJobOptions: {
     attempts: 5,
     backoff: { type: 'custom' },
+    removeOnComplete: 100,
+    removeOnFail: false,
   },
 });
 

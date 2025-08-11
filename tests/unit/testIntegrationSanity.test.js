@@ -7,14 +7,6 @@ vi.mock('../../sync/clients/zohoClient.js', () => ({
   createOrUpdateContact: vi.fn().mockResolvedValue({}),
   createOrUpdateAddress: vi.fn().mockResolvedValue({}),
 }));
-vi.mock('../../src/queues/zohoQueue.js', () => ({
-  addZohoJob: vi.fn().mockResolvedValue(null),
-}));
-vi.mock('../../src/services/idempotency.js', () => ({
-  setIfNotExists: vi.fn().mockResolvedValue(true),
-  buildKey: vi.fn(() => 'key'),
-  hashPayload: vi.fn(() => 'hash'),
-}));
 import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
 import { processPrintIQCustomerWebhook } from '../../sync/handlers/processPrintIQCustomerWebhook.js';
 import { processPrintIQContactWebhook } from '../../sync/handlers/processPrintIQContactWebhook.js';
@@ -73,10 +65,8 @@ describe('Integration Handler Sanity Checks', () => {
   });
 
   it('should process sample customer without throwing', async () => {
-    const req = { body: sampleCustomer, headers: {} };
-    const res = { status: vi.fn().mockReturnThis(), send: vi.fn() };
     await expect(
-      processPrintIQCustomerWebhook(req, res)
+      processPrintIQCustomerWebhook(sampleCustomer)
     ).resolves.not.toThrow();
   });
 
