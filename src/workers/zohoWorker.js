@@ -13,6 +13,9 @@ export const worker = new Worker(
   'zoho',
   async job => {
     logger.info({ jobId: job.id, name: job.name }, 'processing job (stub)');
+    if (job.name === 'customer.upsert' && job.data.forceFail) {
+      throw new Error('Intentional test failure');
+    }
     // TODO: call real upsert here later
     return { ok: true };
   },
