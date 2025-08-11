@@ -2,7 +2,8 @@ import fs from 'fs';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { zohoAccountsUrl, zohoUrl } from '../../src/config/env.js';
+import { zohoAccountsUrl, crmUrl } from '../../src/config/env.js';
+import { logger } from '../../src/utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN_FILE = path.join(__dirname, '../../token.json');
 let tokens = {};
@@ -16,7 +17,7 @@ function saveTokens() {
 }
 
 export async function refreshAccessToken() {
-  console.log('🔄 Refreshing Zoho access token...');
+  logger.info('🔄 Refreshing Zoho access token...');
   try {
     const response = await axios.post(
       zohoAccountsUrl('/oauth/v2/token'),
@@ -35,11 +36,11 @@ export async function refreshAccessToken() {
     tokens.expires_in = Date.now() + response.data.expires_in * 1000;
     saveTokens();
 
-    console.log('✅ Access token refreshed successfully.');
+    logger.info('✅ Access token refreshed successfully.');
   } catch (error) {
-    console.error(
-      '❌ Failed to refresh access token:',
-      error.response?.data || error.message
+    logger.error(
+      { err: error.response?.data || error.message },
+      '❌ Failed to refresh access token'
     );
     throw new Error('Failed to refresh access token.');
   }
@@ -61,20 +62,24 @@ export async function getValidAccessToken() {
 }
 
 export async function tokenDoctor() {
-  console.log('🩺 Running Token Doctor...');
+  logger.info('🩺 Running Token Doctor...');
   const token = await getValidAccessToken();
 
   try {
-    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
+    const response = await axios.get(crmUrl('/users?type=CurrentUser'), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
 
     const user = response.data.users[0];
-    console.log(
-      `✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`
+    logger.info(
+      { user: { name: user.full_name, email: user.email } },
+      '✅ CRM Access OK'
     );
   } catch (err) {
-    console.error('❌ Token check failed:', err.response?.data || err.message);
+    logger.error(
+      { err: err.response?.data || err.message },
+      '❌ Token check failed'
+    );
     throw new Error('Token appears invalid for CRM access.');
   }
 }
