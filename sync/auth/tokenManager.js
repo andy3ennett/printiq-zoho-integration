@@ -1,90 +1,56 @@
-import fs from 'fs';
-import axios from 'axios';
+// sync/auth/tokenManager.js
+import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { zohoAccountsUrl } from '../../src/config/env.js';
-import { getCurrentUser } from '../../src/zoho/client.js';
-import { logger } from '../../src/utils/logger.js';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TOKEN_FILE = path.join(__dirname, '../../token.json');
-let tokens = {};
+import { logger } from '../../src/logger.js';
 
-if (fs.existsSync(TOKEN_FILE)) {
-  tokens = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+const TOKEN_FILE = path.resolve(process.env.TOKEN_FILE || './token.json');
+
+export async function getAccessToken() {
+  const data = await fs.readFile(TOKEN_FILE, 'utf8');
+  const { access_token } = JSON.parse(data);
+  return access_token;
 }
 
-function saveTokens() {
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+export const getValidAccessToken = getAccessToken;
+export const getAccessTokenAlias = (...args) => getValidAccessToken(...args);
+
+export async function saveAccessToken(access_token, refresh_token) {
+  await fs.writeFile(
+    TOKEN_FILE,
+    JSON.stringify({ access_token, refresh_token }),
+    'utf8'
+  );
+  logger.info('Access token saved');
 }
 
-export async function refreshAccessToken() {
-  logger.info('🔄 Refreshing Zoho access token...');
-  try {
-    const response = await axios.post(
-      zohoAccountsUrl('/oauth/v2/token'),
-      null,
-      {
-        params: {
-          grant_type: 'refresh_token',
-          client_id: process.env.ZOHO_CLIENT_ID,
-          client_secret: process.env.ZOHO_CLIENT_SECRET,
-          refresh_token: tokens.refresh_token,
-        },
-      }
-    );
-
-    tokens.access_token = response.data.access_token;
-    tokens.expires_in = Date.now() + response.data.expires_in * 1000;
-    saveTokens();
-
-    logger.info('✅ Access token refreshed successfully.');
-  } catch (error) {
-    logger.error(
-      { err: error.response?.data || error.message },
-      '❌ Failed to refresh access token'
-    );
-    throw new Error('Failed to refresh access token.');
-  }
-}
-
-export async function getValidAccessToken() {
-  if (!tokens.access_token || !tokens.expires_in) {
-    throw new Error(
-      '❌ No valid access token found. Please authenticate via /auth.'
-    );
-  }
-
-  const msUntilExpiry = tokens.expires_in - Date.now();
-  if (msUntilExpiry < 5 * 60 * 1000) {
-    await refreshAccessToken();
-  }
-
-  return tokens.access_token;
+export async function getRefreshToken() {
+  const data = await fs.readFile(TOKEN_FILE, 'utf8');
+  const { refresh_token } = JSON.parse(data);
+  return refresh_token;
 }
 
 export async function tokenDoctor() {
-  logger.info('🩺 Running Token Doctor...');
-  const token = await getValidAccessToken();
-
   try {
-    const user = await getCurrentUser(token);
-    logger.info(
-      { user: { name: user.full_name, email: user.email } },
-      '✅ CRM Access OK'
-    );
+    const data = await fs.readFile(TOKEN_FILE, 'utf8');
+    const parsed = JSON.parse(data || '{}');
+
+    if (!parsed || typeof parsed !== 'object') {
+      return { ok: false, reason: 'token file is not valid JSON' };
+    }
+
+    if (!parsed.access_token) {
+      return { ok: false, reason: 'missing access_token' };
+    }
+
+    if (!parsed.refresh_token) {
+      return { ok: false, reason: 'missing refresh_token' };
+    }
+
+    return { ok: true, reason: null };
   } catch (err) {
-    logger.error(
-      { err: err.response?.data || err.message },
-      '❌ Token check failed'
-    );
-    throw new Error('Token appears invalid for CRM access.');
+    if (err && err.code === 'ENOENT') {
+      return { ok: false, reason: 'token file not found' };
+    }
+    return { ok: false, reason: 'unable to read token file' };
   }
-}
-
-export function _resetTokens() {
-  tokens = {};
-}
-
-export function _setTokens(newTokens) {
-  tokens = newTokens;
 }

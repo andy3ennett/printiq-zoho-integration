@@ -1,27 +1,30 @@
-const originalError = console.error;
-const originalWarn = console.warn;
+// vitest.setup.js
+// Ensure a consistent global NonRetryableError class for tests
+(function ensureGlobalNonRetryable() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : global;
+  if (!g.NonRetryableError) {
+    class NonRetryableError extends Error {
+      constructor(message) {
+        super(message);
+        this.name = 'NonRetryableError';
+        this.nonRetryable = true; // also marked by flag for looser checks
+      }
+    }
+    g.NonRetryableError = NonRetryableError;
+  }
+})();
 
-// Only suppress API-related logs
-const suppressPatterns = [
-  'Error upserting Zoho',
-  '❌',
-  'Invalid URL',
-  'Zoho API failure',
-  'Contact webhook sync failed',
-];
+// Provide a stable async token helper some tests rely on
+(function ensureGetValidAccessToken() {
+  const g = typeof globalThis !== 'undefined' ? globalThis : global;
+  if (!g.getValidAccessToken) {
+    g.getValidAccessToken = async () => 'test-token';
+  }
+})();
 
-function shouldSuppress(message) {
-  return suppressPatterns.some(pattern => message.toString().includes(pattern));
+// Normalize the base URL used by Zoho client during tests to match nock expectations
+if (!process.env.ZOHO_BASE_URL) {
+  process.env.ZOHO_BASE_URL = 'https://www.zohoapis.com';
 }
 
-console.error = (...args) => {
-  if (!shouldSuppress(args[0])) {
-    originalError(...args);
-  }
-};
-
-console.warn = (...args) => {
-  if (!shouldSuppress(args[0])) {
-    originalWarn(...args);
-  }
-};
+export {};

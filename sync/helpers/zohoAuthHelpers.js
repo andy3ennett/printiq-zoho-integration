@@ -1,16 +1,24 @@
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
 import { zohoUrl } from '../../src/config/env.js';
+import * as tokenManager from '../auth/tokenManager.js';
 
-const tokenData = JSON.parse(
-  fs.readFileSync(path.resolve('./token.json'), 'utf-8')
-);
-
-const headers = {
-  Authorization: `Zoho-oauthtoken ${tokenData.access_token}`,
-  'Content-Type': 'application/json',
-};
+// Always return a Promise that resolves to a token.
+// Supports both named and default exports from the token manager.
+export async function getValidAccessToken() {
+  if (typeof tokenManager.getValidAccessToken === 'function') {
+    return await tokenManager.getValidAccessToken();
+  }
+  if (tokenManager?.default?.getValidAccessToken) {
+    return await tokenManager.default.getValidAccessToken();
+  }
+  if (typeof tokenManager.getAccessToken === 'function') {
+    return await tokenManager.getAccessToken();
+  }
+  if (tokenManager?.default?.getAccessToken) {
+    return await tokenManager.default.getAccessToken();
+  }
+  throw new Error('No token getter available');
+}
 
 export async function createOrUpdateZohoAccount(accountData) {
   const payload = {
@@ -19,6 +27,12 @@ export async function createOrUpdateZohoAccount(accountData) {
   };
 
   try {
+    const token = await getValidAccessToken();
+    const headers = {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    };
+
     const criteria = `((Integration_ID:equals:${accountData.Integration_ID}) or (Customer_Code:equals:${accountData.Customer_Code}))`;
     const searchUrl = `${zohoUrl('Accounts/search')}?criteria=${encodeURIComponent(
       criteria
@@ -52,6 +66,12 @@ export async function createOrUpdateZohoAccount(accountData) {
 
 export async function findAccountByCustomerId(customerId) {
   try {
+    const token = await getValidAccessToken();
+    const headers = {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    };
+
     const criteria = `(PrintIQ_Customer_ID:equals:${customerId})`;
     const searchUrl = `${zohoUrl('Accounts/search')}?criteria=${encodeURIComponent(
       criteria
@@ -94,6 +114,12 @@ export async function updateAccountAddressSubform(accountId, address) {
   };
 
   try {
+    const token = await getValidAccessToken();
+    const headers = {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    };
+
     const res = await axios.put(updateUrl, payload, { headers });
     return res.data;
   } catch (err) {
@@ -104,3 +130,10 @@ export async function updateAccountAddressSubform(accountId, address) {
     throw new Error('Failed to update address subform');
   }
 }
+
+export default {
+  getValidAccessToken,
+  createOrUpdateZohoAccount,
+  findAccountByCustomerId,
+  updateAccountAddressSubform,
+};

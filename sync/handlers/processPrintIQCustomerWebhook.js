@@ -10,10 +10,12 @@ export async function processPrintIQCustomerWebhook(req, res) {
 
   const idemKey = `printiq:${event}:${id}`;
   const fresh = await setOnce(idemKey, 1800);
-  if (!fresh) return res.status(200).json({ deduped: true });
+
+  // Return 202 for idempotent repeat as well
+  if (!fresh) return res.status(202).json({ deduped: true });
 
   await enqueueCustomerUpsert({ requestId: req.id, printiqCustomerId, name });
-  return res.status(202).json({ queued: true }); // 202 per test expectation
+  return res.status(202).json({ queued: true });
 }
 
 export const printiqCustomerRouter = Router();

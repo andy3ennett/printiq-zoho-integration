@@ -1,18 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../sync/auth/tokenManager.js', () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue('tok'),
-}));
+vi.mock('../../sync/auth/tokenManager.js', () => {
+  const getAccessToken = vi.fn().mockResolvedValue('tok');
+  return {
+    // named export
+    getAccessToken,
+    // default export (some code paths look here)
+    default: { getAccessToken },
+  };
+});
 
 const searchMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
-vi.mock('../../src/zoho/client.js', () => {
+vi.mock('../../src/services/zoho.client.js', () => {
   class NonRetryableError extends Error {}
   return {
-    searchAccountsByExternalId: (...a) => searchMock(...a),
-    createAccount: (...a) => createMock(...a),
-    updateAccount: (...a) => updateMock(...a),
+    zohoClient: {
+      searchAccountByExternalId: (...a) => searchMock(...a),
+      createAccount: (...a) => createMock(...a),
+      updateAccount: (...a) => updateMock(...a),
+    },
     NonRetryableError,
   };
 });
@@ -21,9 +29,16 @@ const mapMock = vi.fn(p => ({
   Account_Name: p.name,
   PrintIQ_Customer_ID: String(p.printiqCustomerId),
 }));
-vi.mock('../../src/mappings/customer.js', () => ({
-  toZohoAccount: (...a) => mapMock(...a),
-}));
+vi.mock('../../src/mappings/customer.js', () => {
+  const mapCustomerToAccount = vi.fn(input => ({
+    Account_Name: input?.name ?? 'Mocked Name',
+    PrintIQ_Customer_ID: String(input?.printiqCustomerId ?? '0'),
+  }));
+  return {
+    mapCustomerToAccount, // named export
+    default: { mapCustomerToAccount }, // default export (for safety)
+  };
+});
 
 import { processor } from '../../src/workers/zohoWorker.js';
 
@@ -63,7 +78,9 @@ describe('worker customer.upsert', () => {
   });
 
   it('discards on NonRetryableError', async () => {
-    const { NonRetryableError } = await import('../../src/zoho/client.js');
+    const { NonRetryableError } = await import(
+      '../../src/services/zoho.client.js'
+    );
     const err = new NonRetryableError('bad');
     searchMock.mockRejectedValue(err);
     const job = {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-const addSpy = vi.fn(async (_name, _data, _opts) => ({ id: 'job-1' }));
+const addSpy = vi.fn(async () => ({ id: 'job-1' }));
 
 vi.mock('bullmq', () => {
   // Our code imports default then destructures: `import pkg from 'bullmq'; const { Queue } = pkg;`

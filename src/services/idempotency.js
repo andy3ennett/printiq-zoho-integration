@@ -1,17 +1,21 @@
+// src/services/idempotency.js
 import Redis from 'ioredis';
 import { logger } from '../logger.js';
 
-const client = new Redis({
+// single instance, single export
+export const redis = new Redis({
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: Number(process.env.REDIS_PORT) || 6379,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
 
-client.on('error', err => logger.error({ err }, 'redis error'));
+if (typeof redis?.on === 'function') {
+  redis.on('error', err => logger.error({ err }, 'redis error'));
+}
 
 export async function setOnce(key, ttlSeconds = 1800) {
-  const res = await client.set(key, '1', 'EX', ttlSeconds, 'NX');
+  const res = await redis.set(key, '1', 'EX', ttlSeconds, 'NX');
   return res === 'OK';
 }
 
