@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 vi.mock('../../sync/auth/tokenManager.js', () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue('token'),
+  __esModule: true,
+  getAccessToken: vi.fn().mockResolvedValue('test-token'),
 }));
 vi.mock('../../sync/clients/zohoClient.js', () => ({
   createOrUpdateCustomer: vi.fn().mockResolvedValue({}),
@@ -18,7 +19,6 @@ vi.mock('../../src/queues/zohoQueue.js', () => ({
 import { processPrintIQCustomerWebhook } from '../../sync/handlers/processPrintIQCustomerWebhook';
 import { processPrintIQContactWebhook } from '../../sync/handlers/processPrintIQContactWebhook';
 import { processPrintIQAddressWebhook } from '../../sync/handlers/processPrintIQAddressWebhook';
-import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
 
 describe('Handler Modules Load and Execute', () => {
   test('should load and run customer handler without error', async () => {
@@ -51,6 +51,6 @@ describe('Handler Modules Load and Execute', () => {
   });
 
   test('should retrieve valid access token', async () => {
-    await expect(getValidAccessToken()).resolves.not.toThrow();
+    await expect(globalThis.getValidAccessToken()).resolves.toBe('test-token');
   });
 });

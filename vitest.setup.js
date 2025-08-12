@@ -18,7 +18,16 @@
 (function ensureGetValidAccessToken() {
   const g = typeof globalThis !== 'undefined' ? globalThis : global;
   if (!g.getValidAccessToken) {
-    g.getValidAccessToken = async () => 'test-token';
+    g.getValidAccessToken = async () => {
+      try {
+        const mod = await import('./sync/auth/tokenManager.js');
+        const fn = mod.getAccessToken || mod?.default?.getAccessToken;
+        const val = typeof fn === 'function' ? await fn() : undefined;
+        return val ?? 'test-token';
+      } catch {
+        return 'test-token';
+      }
+    };
   }
 })();
 
