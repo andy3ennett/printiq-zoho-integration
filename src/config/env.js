@@ -26,8 +26,8 @@ export function zohoUrl(path = '') {
 export const zohoAccountsUrl = p =>
   new URL(normalize(p), env.ZOHO_ACCOUNTS_URL).toString();
 
-// Convenience helper for Zoho CRM v2 endpoints
+// Convenience helper for Zoho CRM v3 endpoints
 export const crmUrl = p => {
   const path = p.startsWith('/') ? p : `/${p}`;
-  return zohoUrl(`/crm/v2${path}`);
+  return zohoUrl(`/crm/v3${path}`);
 };

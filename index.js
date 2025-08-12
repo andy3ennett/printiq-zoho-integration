@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { zohoAccountsUrl, env, crmUrl } from './src/config/env.js';
+import { zohoAccountsUrl, env } from './src/config/env.js';
 import express from 'express';
 import fs from 'fs';
 import os from 'os';
@@ -15,6 +15,7 @@ import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
 import client from 'prom-client';
 import { zohoQueue } from './src/queues/zohoQueue.js';
+import { getCurrentUser } from './src/zoho/client.js';
 
 // Metrics setup
 const register = new client.Registry();
@@ -173,11 +174,7 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/health-check', async (req, res) => {
   try {
     const token = await getValidAccessToken();
-    const response = await axios.get(crmUrl('/users?type=CurrentUser'), {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
-
-    const user = response.data.users[0];
+    const user = await getCurrentUser(token);
     res.json({
       status: 'OK',
       message: 'Connected to Zoho CRM successfully!',
@@ -249,12 +246,7 @@ app.get('/health/all', requireTokenAuth, async (req, res) => {
 
   try {
     const token = await getValidAccessToken();
-
-    const crmRes = await axios.get(crmUrl('/users?type=CurrentUser'), {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
-
-    const user = crmRes.data.users[0];
+    const user = await getCurrentUser(token);
     const files = fs
       .readdirSync(logDir)
       .filter(f => f.endsWith('.log'))
