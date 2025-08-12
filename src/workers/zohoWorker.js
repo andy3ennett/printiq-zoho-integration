@@ -1,75 +1,49 @@
-// src/workers/zohoWorker.js
 import pkg from 'bullmq';
-import IORedis from 'ioredis';
-import { env } from '../config/env.js';
-import { logger } from '../middleware/logging.js';
-import {
-  upsertZohoAccountByExternalId,
-  NonRetryableError,
-} from '../zoho/client.js';
-import { mapPrintIQCustomerToZohoAccount } from '../mappings/customer.js';
-
 const { Worker } = pkg;
+import { logger } from '../logger.js';
+import { zohoClient } from '../services/zoho.client.js';
+import { mapCustomerToAccount } from '../mappings/customer.js';
+import { getAccessToken } from '../../sync/auth/tokenManager.js';
 
-const connection = new IORedis(env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: true,
-});
-
-async function processor(job) {
-  const { name, data, id: jobId, attemptsMade } = job;
-  const { printiqCustomerId, forceFail } = data || {};
-
-  logger.info(
-    { jobId, name, attemptsMade, printiqCustomerId },
-    'worker received job'
-  );
-
-  // Deterministic failure path for exercising DLQ in non-prod
-  if (forceFail && env.NODE_ENV !== 'production') {
-    throw new Error('Forced failure for test (non-prod)');
-  }
-
-  try {
-    // Fetch/construct mapped payload for Zoho
-    const account = await mapPrintIQCustomerToZohoAccount(printiqCustomerId);
-    const res = await upsertZohoAccountByExternalId(printiqCustomerId, account);
-
-    logger.info(
-      { jobId, printiqCustomerId, zohoId: res?.id },
-      'customer upserted'
-    );
-    return { ok: true, zohoId: res?.id };
-  } catch (err) {
-    // If the client marked this as non-retryable, mark as failed permanently
-    if (err instanceof NonRetryableError) {
-      logger.warn(
-        { jobId, printiqCustomerId, reason: err.message },
-        'non-retryable job; discarding'
-      );
-      // letting it throw will mark failed; BullMQ will not retry when attempts exhausted; for hard stop:
-      // return without throwing to mark completed-but-unsuccessful; we prefer fail:
-      throw err;
-    }
-
-    logger.error(
-      { jobId, printiqCustomerId, err: err?.message },
-      'retryable error in worker'
-    );
-    // Throw to let BullMQ retry according to attempts/backoff
+export async function processor(job) {
+  const { printiqCustomerId, name, forceFail } = job.data || {};
+  if (forceFail && process.env.NODE_ENV !== 'production') {
+    const err = new Error('Forced failure for DLQ testing');
+    err.nonRetryable = false;
     throw err;
+  }
+  const token = await getAccessToken();
+  const fields = mapCustomerToAccount({ printiqCustomerId, name });
+
+  const found = await zohoClient.searchAccountByExternalId(
+    token,
+    printiqCustomerId
+  );
+  if (!found) {
+    const created = await zohoClient.createAccount(token, fields);
+    return { path: 'create', zohoId: created.id };
+  } else {
+    await zohoClient.updateAccount(token, found.id, fields);
+    return { path: 'update', zohoId: found.id };
   }
 }
 
-export const zohoWorker = new Worker('zoho', processor, {
-  connection,
-  concurrency: Number(env.WORKER_CONCURRENCY || 5),
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const queueName = process.env.ZOHO_QUEUE_NAME || 'zoho';
+  const worker = new Worker(queueName, processor, {
+    connection: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    },
+  });
 
-zohoWorker.on('ready', () => logger.info('zohoWorker ready'));
-zohoWorker.on('failed', (job, err) =>
-  logger.error({ jobId: job?.id, err: err?.message }, 'job failed')
-);
-zohoWorker.on('completed', job =>
-  logger.info({ jobId: job?.id }, 'job completed')
-);
+  worker.on('ready', () => logger.info('zohoWorker ready'));
+  worker.on('failed', (job, err) =>
+    logger.error({ jobId: job?.id, err }, 'worker job failed')
+  );
+  worker.on('completed', job =>
+    logger.info({ jobId: job?.id }, 'worker job completed')
+  );
+}

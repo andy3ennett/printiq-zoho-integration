@@ -1,27 +1,20 @@
-import crypto from 'crypto';
-import IORedis from 'ioredis';
-import { env } from '../config/env.js';
+import Redis from 'ioredis';
+import { logger } from '../logger.js';
 
-export const redis =
-  process.env.NODE_ENV === 'test'
-    ? { set: async () => 'OK', ping: async () => 'PONG' }
-    : new IORedis(env.REDIS_URL, {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: true,
-      });
+const client = new Redis({
+  host: process.env.REDIS_HOST || '127.0.0.1',
+  port: Number(process.env.REDIS_PORT) || 6379,
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+});
 
-export async function setIfNotExists(key, ttlSecs, client = redis) {
-  const res = await client.set(key, '1', 'EX', ttlSecs, 'NX');
+client.on('error', err => logger.error({ err }, 'redis error'));
+
+export async function setOnce(key, ttlSeconds = 1800) {
+  const res = await client.set(key, '1', 'EX', ttlSeconds, 'NX');
   return res === 'OK';
 }
 
-export function buildKey(eventType, eventId) {
-  return `printiq:${eventType}:${eventId}`;
-}
-
-export function hashPayload(payload) {
-  return crypto
-    .createHash('sha256')
-    .update(JSON.stringify(payload))
-    .digest('hex');
+export async function setIfNotExists(key, ttlSeconds = 1800) {
+  return setOnce(key, ttlSeconds);
 }

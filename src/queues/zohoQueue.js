@@ -1,53 +1,37 @@
-// src/queues/zohoQueue.js
 import pkg from 'bullmq';
-import IORedis from 'ioredis';
-import { env } from '../config/env.js';
-import { logger } from '../middleware/logging.js';
-
 const { Queue } = pkg;
+import { logger } from '../logger.js';
 
-// Shared Redis connection options required by BullMQ
-const connection = new IORedis(env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: true,
-});
+const queueName = process.env.ZOHO_QUEUE_NAME || 'zoho';
 
-// Base queue with sensible defaults
-export const zohoQueue = new Queue('zoho', {
-  connection,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: { type: 'exponential', delay: 500 },
-    // keep some history for observability, but avoid unbounded growth
-    removeOnComplete: 100,
-    removeOnFail: false,
+export const defaultJobOptions = {
+  attempts: 5,
+  backoff: { type: 'exponential', delay: 500 },
+  removeOnComplete: 100,
+  removeOnFail: false,
+};
+
+export const zohoQueue = new Queue(queueName, {
+  connection: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: Number(process.env.REDIS_PORT) || 6379,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
   },
+  defaultJobOptions, // keep for runtime
 });
 
-const isProd = env.NODE_ENV === 'production';
-
-/**
- * Enqueue a customer upsert job.
- * - Minimizes payload to what the worker needs.
- * - Supports fast-fail for dev/testing when `forceFail` is true.
- */
-export async function enqueueCustomerUpsert({
-  printiqCustomerId,
-  forceFail = false,
-}) {
+export async function enqueueCustomerUpsert(
+  { requestId, printiqCustomerId, name },
+  overrides = {}
+) {
   const jobName = 'customer.upsert';
+  const payload = { requestId, printiqCustomerId, name };
 
-  // Fast-fail in non-prod to exercise the DLQ paths deterministically
-  const overrides =
-    !isProd && forceFail ? { attempts: 1, backoff: undefined } : {};
+  // Pass explicit options so tests can assert them from add() call
+  const opts = { ...defaultJobOptions, ...overrides };
 
-  const payload = {
-    printiqCustomerId,
-    source: 'printiq',
-    ...(forceFail ? { forceFail: true } : {}),
-  };
-
-  const job = await zohoQueue.add(jobName, payload, overrides);
+  const job = await zohoQueue.add(jobName, payload, opts);
   logger.info(
     { jobId: job.id, printiqCustomerId, overrides },
     'queued customer.upsert'
