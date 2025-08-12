@@ -12,3 +12,9 @@ export const createAccount = vi.fn(async (token, fields) => {
 export const updateAccount = vi.fn(async (token, accountId, fields) => {
   return { success: true };
 });
+
+export default {
+  searchAccountByExternalId,
+  createAccount,
+  updateAccount,
+};
