@@ -35,7 +35,7 @@ export function createDealLifecycleHandler({
     try {
       const payload = req.body;
       const event = payload.event?.toLowerCase();
-      const username = payload.username;
+      const username = payload.user;
 
       if (!VALID_EVENTS.includes(event)) {
         return res.status(400).send({ message: 'Unsupported event type.' });
