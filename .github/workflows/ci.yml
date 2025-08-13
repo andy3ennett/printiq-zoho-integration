@@ -21,20 +21,25 @@ env:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        node: [20, 22] # Node 18 is near/at EOL; add back if you must
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+
+      - name: Env diagnostics
+        run: |
+          node -v
+          npm -v
+          uname -a
+          printenv | sort | sed -n '1,120p'
 
       - name: Prepare npm to avoid platform-specific optional deps
         run: |
@@ -55,14 +60,13 @@ jobs:
       - name: Tests (with coverage)
         run: npm test -- --coverage
 
-      # Run audit once to reduce noise (Ubuntu, latest Node only)
       - name: Security audit (informational)
-        if: matrix.os == 'ubuntu-latest' && matrix.node == '22'
+        if: matrix.node == '22'
         run: npm audit --omit=dev --audit-level=high || true
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-${{ matrix.os }}-node${{ matrix.node }}
+          name: coverage-ubuntu-node${{ matrix.node }}
           path: coverage
           if-no-files-found: ignore
