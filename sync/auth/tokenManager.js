@@ -1,88 +1,56 @@
-import fs from 'fs';
-import axios from 'axios';
+// sync/auth/tokenManager.js
+import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { zohoAccountsUrl, zohoUrl } from '../../src/config/env.js';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TOKEN_FILE = path.join(__dirname, '../../token.json');
-let tokens = {};
+import { logger } from '../../src/logger.js';
 
-if (fs.existsSync(TOKEN_FILE)) {
-  tokens = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+const TOKEN_FILE = path.resolve(process.env.TOKEN_FILE || './token.json');
+
+export async function getAccessToken() {
+  const data = await fs.readFile(TOKEN_FILE, 'utf8');
+  const { access_token } = JSON.parse(data);
+  return access_token;
 }
 
-function saveTokens() {
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+export const getValidAccessToken = getAccessToken;
+export const getAccessTokenAlias = (...args) => getValidAccessToken(...args);
+
+export async function saveAccessToken(access_token, refresh_token) {
+  await fs.writeFile(
+    TOKEN_FILE,
+    JSON.stringify({ access_token, refresh_token }),
+    'utf8'
+  );
+  logger.info('Access token saved');
 }
 
-export async function refreshAccessToken() {
-  console.log('🔄 Refreshing Zoho access token...');
-  try {
-    const response = await axios.post(
-      zohoAccountsUrl('/oauth/v2/token'),
-      null,
-      {
-        params: {
-          grant_type: 'refresh_token',
-          client_id: process.env.ZOHO_CLIENT_ID,
-          client_secret: process.env.ZOHO_CLIENT_SECRET,
-          refresh_token: tokens.refresh_token,
-        },
-      }
-    );
-
-    tokens.access_token = response.data.access_token;
-    tokens.expires_in = Date.now() + response.data.expires_in * 1000;
-    saveTokens();
-
-    console.log('✅ Access token refreshed successfully.');
-  } catch (error) {
-    console.error(
-      '❌ Failed to refresh access token:',
-      error.response?.data || error.message
-    );
-    throw new Error('Failed to refresh access token.');
-  }
-}
-
-export async function getValidAccessToken() {
-  if (!tokens.access_token || !tokens.expires_in) {
-    throw new Error(
-      '❌ No valid access token found. Please authenticate via /auth.'
-    );
-  }
-
-  const msUntilExpiry = tokens.expires_in - Date.now();
-  if (msUntilExpiry < 5 * 60 * 1000) {
-    await refreshAccessToken();
-  }
-
-  return tokens.access_token;
+export async function getRefreshToken() {
+  const data = await fs.readFile(TOKEN_FILE, 'utf8');
+  const { refresh_token } = JSON.parse(data);
+  return refresh_token;
 }
 
 export async function tokenDoctor() {
-  console.log('🩺 Running Token Doctor...');
-  const token = await getValidAccessToken();
-
   try {
-    const response = await axios.get(zohoUrl('/users?type=CurrentUser'), {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    });
+    const data = await fs.readFile(TOKEN_FILE, 'utf8');
+    const parsed = JSON.parse(data || '{}');
 
-    const user = response.data.users[0];
-    console.log(
-      `✅ CRM Access OK. Logged in as: ${user.full_name} (${user.email})`
-    );
+    if (!parsed || typeof parsed !== 'object') {
+      return { ok: false, reason: 'token file is not valid JSON' };
+    }
+
+    if (!parsed.access_token) {
+      return { ok: false, reason: 'missing access_token' };
+    }
+
+    if (!parsed.refresh_token) {
+      return { ok: false, reason: 'missing refresh_token' };
+    }
+
+    return { ok: true, reason: null };
   } catch (err) {
-    console.error('❌ Token check failed:', err.response?.data || err.message);
-    throw new Error('Token appears invalid for CRM access.');
+    if (err && err.code === 'ENOENT') {
+      return { ok: false, reason: 'token file not found' };
+    }
+    return { ok: false, reason: 'unable to read token file' };
   }
-}
-
-export function _resetTokens() {
-  tokens = {};
-}
-
-export function _setTokens(newTokens) {
-  tokens = newTokens;
 }
