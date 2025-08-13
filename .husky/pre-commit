@@ -1,4 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env sh
+set -e
 
-npx lint-staged
+echo "Running pre-commit hooks…"
 
+if command -v lint-staged >/dev/null 2>&1; then
+  lint-staged
+else
+  npx -y lint-staged@15
+fi
