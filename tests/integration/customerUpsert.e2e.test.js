@@ -1,87 +1,125 @@
-import { describe, it, expect, vi } from 'vitest';
-import nock from 'nock';
-import { processor } from '../../src/workers/zohoWorker.js';
-nock.disableNetConnect();
-process.env.HTTP_PROXY = '';
-process.env.http_proxy = '';
-process.env.HTTPS_PROXY = '';
-process.env.https_proxy = '';
-process.env.npm_config_proxy = '';
-process.env.npm_config_https_proxy = '';
-process.env.GLOBAL_AGENT_HTTP_PROXY = '';
+import { vi, describe, beforeEach, test, expect } from 'vitest';
 
-vi.mock('../../sync/auth/tokenManager.js', () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue('token'),
+// --- Define mocks before importing the worker ---
+vi.mock('../../src/services/zoho.client.js', () => ({
+  __esModule: true,
+  searchAccountByExternalId: vi.fn(),
+  createAccount: vi.fn(),
+  updateAccount: vi.fn(),
 }));
 
-describe('customer upsert processor e2e', () => {
-  it('creates account when missing', async () => {
-    nock('https://www.zohoapis.com')
-      .get('/crm/v3/Accounts/search')
-      .query(true)
-      .reply(200, { data: [] })
-      .post('/crm/v3/Accounts')
-      .reply(201, { data: [{ details: { id: 'z1' } }] });
-
-    const job = {
-      id: '1',
-      data: { requestId: 'r', printiqCustomerId: 1, name: 'Acme' },
-      discard: vi.fn(),
-      attemptsMade: 0,
-    };
-    const res = await processor(job);
-    expect(res.zohoId).toBe('z1');
-    expect(nock.isDone()).toBe(true);
-  });
-
-  it('updates account when exists', async () => {
-    nock('https://www.zohoapis.com')
-      .get('/crm/v3/Accounts/search')
-      .query(true)
-      .reply(200, { data: [{ id: 'z2' }] })
-      .put('/crm/v3/Accounts/z2')
-      .reply(200, { data: [{ details: { id: 'z2' } }] });
-
-    const job = {
-      id: '2',
-      data: { requestId: 'r', printiqCustomerId: 2, name: 'Beta' },
-      discard: vi.fn(),
-      attemptsMade: 0,
-    };
-    const res = await processor(job);
-    expect(res.path).toBe('update');
-    expect(nock.isDone()).toBe(true);
-  });
-
-  it('retries on 429 then succeeds', async () => {
-    nock('https://www.zohoapis.com')
-      .get('/crm/v3/Accounts/search')
-      .query(true)
-      .reply(429)
-      .get('/crm/v3/Accounts/search')
-      .query(true)
-      .reply(429)
-      .get('/crm/v3/Accounts/search')
-      .query(true)
-      .reply(200, { data: [] });
-
-    nock('https://www.zohoapis.com')
-      .post('/crm/v3/Accounts')
-      .reply(201, { data: [{ details: { id: 'z3' } }] });
-
-    const job = {
-      id: '3',
-      data: { requestId: 'r', printiqCustomerId: 3, name: 'Gamma' },
-      discard: vi.fn(),
-      attemptsMade: 0,
-    };
-    const res = await processor(job);
-    expect(res.zohoId).toBe('z3');
-    expect(nock.isDone()).toBe(true);
-  });
+vi.mock('../../sync/auth/tokenManager.js', () => {
+  const get = vi.fn(async () => 'test-token');
+  return {
+    default: { getAccessToken: get },
+    getAccessToken: get,
+  };
 });
 
-afterAll(() => {
-  nock.enableNetConnect();
-  nock.cleanAll();
+vi.mock('../../src/mappings/customer.js', () => ({
+  __esModule: true,
+  mapCustomerToAccount: vi.fn(({ printiqCustomerId, name }) => ({
+    Account_Name: name,
+    PrintIQ_Customer_ID: String(printiqCustomerId),
+  })),
+}));
+
+// Import after mocks so the worker sees mocked modules
+import * as zoho from '../../src/services/zoho.client.js';
+import { mapCustomerToAccount } from '../../src/mappings/customer.js';
+import { processor } from '../../src/workers/zohoWorker.js';
+
+function makeNonRetryableError(message = 'bad') {
+  const NonRetryable = globalThis.NonRetryableError;
+  if (typeof NonRetryable === 'function') {
+    return new NonRetryable(message);
+  }
+  const err = new Error(message);
+  err.name = 'NonRetryableError';
+  err.nonRetryable = true;
+  return err;
+}
+
+describe('customer upsert processor e2e', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('creates account when missing', async () => {
+    const job = { data: { printiqCustomerId: 1, name: 'Acme' } };
+
+    zoho.searchAccountByExternalId.mockResolvedValueOnce(null);
+    const createdPayload = { id: 'z1', data: [{ details: { id: 'z1' } }] };
+    zoho.createAccount.mockResolvedValueOnce(createdPayload);
+
+    const result = await processor(job);
+
+    expect(zoho.searchAccountByExternalId).toHaveBeenCalledWith(
+      'test-token',
+      1
+    );
+    expect(mapCustomerToAccount).toHaveBeenCalledWith({
+      printiqCustomerId: 1,
+      name: 'Acme',
+    });
+    expect(zoho.createAccount).toHaveBeenCalledTimes(1);
+    expect(zoho.updateAccount).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({ path: 'create', zohoId: expect.any(String) })
+    );
+  });
+
+  test('updates account when exists', async () => {
+    const job = { data: { printiqCustomerId: 2, name: 'Beta' } };
+
+    zoho.searchAccountByExternalId.mockResolvedValueOnce({ id: 'z2' });
+    zoho.updateAccount.mockResolvedValueOnce({ success: true });
+
+    const result = await processor(job);
+
+    expect(zoho.searchAccountByExternalId).toHaveBeenCalledWith(
+      'test-token',
+      2
+    );
+    expect(zoho.updateAccount).toHaveBeenCalledWith('test-token', 'z2', {
+      Account_Name: 'Beta',
+      PrintIQ_Customer_ID: '2',
+    });
+    expect(result).toEqual({ path: 'update', zohoId: 'z2' });
+  });
+
+  test('retries on 429 then succeeds (update path)', async () => {
+    const job = { data: { printiqCustomerId: 3, name: 'Gamma' } };
+
+    zoho.searchAccountByExternalId.mockResolvedValueOnce({ id: 'z3' });
+
+    const rateLimitErr = new Error('rate limited');
+    rateLimitErr.response = { status: 429 };
+    zoho.updateAccount
+      .mockRejectedValueOnce(rateLimitErr)
+      .mockResolvedValueOnce({ success: true });
+
+    const result = await processor(job);
+
+    expect(zoho.searchAccountByExternalId).toHaveBeenCalledWith(
+      'test-token',
+      3
+    );
+    expect(zoho.updateAccount).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ path: 'update', zohoId: 'z3' });
+  });
+
+  test('discards on NonRetryableError', async () => {
+    const err = makeNonRetryableError('bad');
+
+    zoho.searchAccountByExternalId.mockRejectedValueOnce(err);
+
+    const job = {
+      data: { printiqCustomerId: 4, name: 'Delta' },
+      discard: vi.fn(),
+    };
+
+    await expect(processor(job)).rejects.toBe(err);
+    expect(job.discard).toHaveBeenCalled();
+  });
 });

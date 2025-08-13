@@ -2,10 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    globals: true,
     environment: 'node',
-    coverage: {
-      reporter: ['text', 'json', 'html'],
-    },
+    globals: true,
+    setupFiles: ['./vitest.setup.js'],
+    restoreMocks: true,
+    clearMocks: true,
+    mockReset: true,
   },
 });

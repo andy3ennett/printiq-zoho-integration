@@ -1,16 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../sync/auth/tokenManager.js', () => ({
-  getValidAccessToken: vi.fn().mockResolvedValue('tok'),
-}));
+vi.mock('../../sync/auth/tokenManager.js', () => {
+  const getAccessToken = vi.fn().mockResolvedValue('test-token');
+  return {
+    __esModule: true,
+    getAccessToken,
+    default: { getAccessToken },
+  };
+});
 
 const searchMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
-vi.mock('../../src/zoho/client.js', () => {
-  class NonRetryableError extends Error {}
+vi.mock('../../src/services/zoho.client.js', () => {
+  class NonRetryableError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'NonRetryableError';
+      this.nonRetryable = true;
+    }
+  }
   return {
-    searchAccountsByExternalId: (...a) => searchMock(...a),
+    __esModule: true,
+    searchAccountByExternalId: (...a) => searchMock(...a),
     createAccount: (...a) => createMock(...a),
     updateAccount: (...a) => updateMock(...a),
     NonRetryableError,
@@ -21,9 +33,17 @@ const mapMock = vi.fn(p => ({
   Account_Name: p.name,
   PrintIQ_Customer_ID: String(p.printiqCustomerId),
 }));
-vi.mock('../../src/mappings/customer.js', () => ({
-  toZohoAccount: (...a) => mapMock(...a),
-}));
+vi.mock('../../src/mappings/customer.js', () => {
+  const mapCustomerToAccount = vi.fn(input => ({
+    Account_Name: input?.name ?? 'Mocked Name',
+    PrintIQ_Customer_ID: String(input?.printiqCustomerId ?? '0'),
+  }));
+  return {
+    __esModule: true,
+    mapCustomerToAccount,
+    default: { mapCustomerToAccount },
+  };
+});
 
 import { processor } from '../../src/workers/zohoWorker.js';
 
@@ -37,7 +57,7 @@ describe('worker customer.upsert', () => {
 
   it('creates account when not found', async () => {
     searchMock.mockResolvedValue(null);
-    createMock.mockResolvedValue({ details: { id: 'z1' } });
+    createMock.mockResolvedValue({ id: 'z1' });
     const job = {
       id: '1',
       data: { requestId: 'r', printiqCustomerId: 1, name: 'Acme' },
@@ -55,7 +75,7 @@ describe('worker customer.upsert', () => {
       data: { requestId: 'r', printiqCustomerId: 2, name: 'Beta' },
     };
     const res = await processor(job);
-    expect(updateMock).toHaveBeenCalledWith('tok', 'z2', {
+    expect(updateMock).toHaveBeenCalledWith('test-token', 'z2', {
       Account_Name: 'Beta',
       PrintIQ_Customer_ID: '2',
     });
@@ -63,7 +83,9 @@ describe('worker customer.upsert', () => {
   });
 
   it('discards on NonRetryableError', async () => {
-    const { NonRetryableError } = await import('../../src/zoho/client.js');
+    const { NonRetryableError } = await import(
+      '../../src/services/zoho.client.js'
+    );
     const err = new NonRetryableError('bad');
     searchMock.mockRejectedValue(err);
     const job = {

@@ -1,10 +1,10 @@
 import { createOrUpdateContact } from '../clients/zohoClient.js';
-import { getValidAccessToken } from '../auth/tokenManager.js';
+import { getAccessToken } from '../auth/tokenManager.js';
 import syncLogger from '../../logs/syncLogger.js';
 
 export async function processPrintIQContactWebhook(contactData) {
   try {
-    await getValidAccessToken();
+    await getAccessToken();
 
     const {
       ContactKey,

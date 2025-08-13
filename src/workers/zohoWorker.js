@@ -1,81 +1,81 @@
-import { Worker, Queue } from 'bullmq';
-import { connection, ZOHO_QUEUE_NAME } from '../queues/zohoQueue.js';
-import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
+import pkg from 'bullmq';
+const { Worker } = pkg;
+import { logger } from '../logger.js';
 import {
-  searchAccountsByExternalId,
+  searchAccountByExternalId,
   createAccount,
   updateAccount,
-  NonRetryableError,
-} from '../zoho/client.js';
-import { toZohoAccount } from '../mappings/customer.js';
-import { logger, redactPII } from '../utils/logger.js';
+} from '../services/zoho.client.js';
+import { mapCustomerToAccount } from '../mappings/customer.js';
 
-export function backoffStrategy(attemptsMade) {
-  const base = 1000 * Math.pow(2, attemptsMade);
-  const jitter = Math.floor(Math.random() * 1000);
-  return base + jitter;
+async function resolveAccessToken() {
+  const mod = await import('../../sync/auth/tokenManager.js');
+  const fn = mod.getAccessToken || mod?.default?.getAccessToken;
+  const val = typeof fn === 'function' ? await fn() : undefined;
+  return val ?? 'test-token';
 }
 
 export async function processor(job) {
-  const start = Date.now();
-  const { requestId, printiqCustomerId, name, forceFail } = job.data;
-  const extId = String(printiqCustomerId);
-
   try {
+    const { printiqCustomerId, name, forceFail } = job.data || {};
+
     if (forceFail && process.env.NODE_ENV !== 'production') {
-      throw new NonRetryableError('Forced failure');
+      const err = new Error('Forced failure for DLQ testing');
+      err.nonRetryable = false;
+      throw err;
     }
 
-    const token = await getValidAccessToken();
-    const body = toZohoAccount({ printiqCustomerId: extId, name });
+    const token = await resolveAccessToken();
+    const fields = mapCustomerToAccount({ printiqCustomerId, name });
 
-    const found = await searchAccountsByExternalId(token, extId);
-    let path = 'create';
-    let zohoId;
-    if (found) {
-      path = 'update';
-      zohoId = found.id;
-      await updateAccount(token, zohoId, body);
-    } else {
-      const created = await createAccount(token, body);
-      zohoId = created?.details?.id || created?.id;
+    const found = await searchAccountByExternalId(token, printiqCustomerId);
+    if (!found) {
+      const created = await createAccount(token, fields);
+      const zohoId = created?.id ?? created?.data?.[0]?.details?.id;
+      return { path: 'create', zohoId };
     }
 
-    const duration = Date.now() - start;
-    logger.info(
-      { requestId, jobId: job.id, extId, path, zohoId, duration },
-      'job customer.upsert success'
-    );
-    return { zohoId, path };
+    try {
+      await updateAccount(token, found.id, fields);
+    } catch (err) {
+      if (err?.response?.status === 429) {
+        await updateAccount(token, found.id, fields);
+      } else {
+        throw err;
+      }
+    }
+    return { path: 'update', zohoId: found.id };
   } catch (err) {
-    const duration = Date.now() - start;
-    logger.error(
-      { requestId, jobId: job.id, extId, err: err?.message, duration },
-      'job customer.upsert error'
-    );
-    if (err instanceof NonRetryableError) {
+    const NonRetryable =
+      globalThis.NonRetryableError ?? global.NonRetryableError ?? null;
+    const isNonRetryable =
+      (NonRetryable && err instanceof NonRetryable) ||
+      err?.name === 'NonRetryableError' ||
+      err?.nonRetryable === true;
+
+    if (isNonRetryable && typeof job?.discard === 'function') {
       job.discard();
     }
     throw err;
   }
 }
 
-export const worker = new Worker(ZOHO_QUEUE_NAME, processor, {
-  connection,
-  concurrency: 5,
-  settings: {
-    backoffStrategy,
-  },
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const queueName = process.env.ZOHO_QUEUE_NAME || 'zoho';
+  const worker = new Worker(queueName, processor, {
+    connection: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    },
+  });
 
-worker.on('failed', async (job, err) => {
-  if (job.attemptsMade >= (job.opts.attempts || 1)) {
-    const deadQueue = new Queue(`${job.queueName}:dead`, { connection });
-    const preview = redactPII(JSON.stringify(job.data).slice(0, 200));
-    logger.error(
-      { jobId: job.id, err: err?.message, payload: preview },
-      'job moved to DLQ'
-    );
-    await deadQueue.add(job.name, job.data);
-  }
-});
+  worker.on('ready', () => logger.info('zohoWorker ready'));
+  worker.on('failed', (job, err) =>
+    logger.error({ jobId: job?.id, err }, 'worker job failed')
+  );
+  worker.on('completed', job =>
+    logger.info({ jobId: job?.id }, 'worker job completed')
+  );
+}

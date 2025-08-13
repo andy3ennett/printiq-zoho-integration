@@ -1,7 +1,9 @@
-export function toZohoAccount(printiq) {
+export function toZohoAccount({ printiqCustomerId, name }) {
   return {
-    Account_Name: printiq.name,
-    PrintIQ_Customer_ID: String(printiq.printiqCustomerId),
-    // TODO: map additional fields as needed
+    Account_Name: name,
+    PrintIQ_Customer_ID: String(printiqCustomerId),
   };
 }
+
+// keep backwards-compat for worker imports
+export { toZohoAccount as mapCustomerToAccount };
