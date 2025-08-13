@@ -55,7 +55,10 @@ jobs:
         run: npm run format:check || npm run format
 
       - name: Lint (soft-fail for now)
-        run: npm run lint || echo "lint soft-fail (to be hardened later)"
+        run: |
+          npm run format:check || npm run format
+          npm run lint
+          npm test -- --coverage
 
       - name: Tests (with coverage)
         run: npm test -- --coverage
