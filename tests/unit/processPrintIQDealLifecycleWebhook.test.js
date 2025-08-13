@@ -50,6 +50,32 @@ describe('processPrintIQDealLifecycleWebhook', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  test('should process printIQ quote_created events', async () => {
+    const req = {
+      body: {
+        event: 'quote_created',
+        quote_id: 'Q5555',
+        status: 'Awaiting Acceptance',
+        customer_id: 'CUST555',
+        user: 'printIQ.Api.Integration',
+      },
+    };
+    const res = mockRes();
+
+    mockDeps.findDealByQuoteId.mockResolvedValue({ id: 'deal555' });
+    mockDeps.updateDealStage.mockResolvedValue({ success: true });
+
+    await handler(req, res);
+
+    expect(mockDeps.findDealByQuoteId).toHaveBeenCalledWith('Q5555');
+    expect(mockDeps.updateDealStage).toHaveBeenCalledWith(
+      'deal555',
+      'Quote Requested',
+      req.body
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   test('should skip processing if source is not printIQ', async () => {
     const req = {
       body: {

@@ -15,6 +15,7 @@ describe('deal lifecycle retry logic', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     mockDeps = {
       findDealByQuoteId: vi.fn(),
       updateDealStage: vi.fn(),
