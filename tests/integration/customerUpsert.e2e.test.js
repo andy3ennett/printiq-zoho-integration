@@ -8,10 +8,13 @@ vi.mock('../../src/services/zoho.client.js', () => ({
   updateAccount: vi.fn(),
 }));
 
-vi.mock('../../sync/auth/tokenManager.js', () => ({
-  __esModule: true,
-  getAccessToken: vi.fn().mockResolvedValue('test-token'),
-}));
+vi.mock('../../sync/auth/tokenManager.js', () => {
+  const get = vi.fn(async () => 'test-token');
+  return {
+    default: { getAccessToken: get },
+    getAccessToken: get,
+  };
+});
 
 vi.mock('../../src/mappings/customer.js', () => ({
   __esModule: true,
