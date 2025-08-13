@@ -3,4 +3,3 @@
 
 npx lint-staged
 
-chmod +x .husky/pre-commit
