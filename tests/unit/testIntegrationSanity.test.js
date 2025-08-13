@@ -7,26 +7,23 @@ vi.mock('../../sync/clients/zohoClient.js', () => ({
   createOrUpdateContact: vi.fn().mockResolvedValue({}),
   createOrUpdateAddress: vi.fn().mockResolvedValue({}),
 }));
+vi.mock('../../src/services/idempotency.js', () => ({
+  setIfNotExists: vi.fn().mockResolvedValue(true),
+  buildKey: (_t, id) => `printiq:customer:${id}`,
+  hashPayload: () => 'hash',
+}));
+vi.mock('../../src/queues/zohoQueue.js', () => ({
+  enqueueCustomerUpsert: vi.fn().mockResolvedValue({}),
+}));
 import { getValidAccessToken } from '../../sync/auth/tokenManager.js';
 import { processPrintIQCustomerWebhook } from '../../sync/handlers/processPrintIQCustomerWebhook.js';
 import { processPrintIQContactWebhook } from '../../sync/handlers/processPrintIQContactWebhook.js';
 import { processPrintIQAddressWebhook } from '../../sync/handlers/processPrintIQAddressWebhook.js';
 
 const sampleCustomer = {
-  ID: 999,
-  Name: 'Test Co.',
-  Phone: '1234567890',
-  Website: 'https://test.co',
-  Code: 'TEST123',
-  Email: 'info@test.co',
-  Fax: '',
-  Comment: 'Sample test customer',
-  Active: 'Yes',
-  AddressLine1: '123 Test St',
-  City: 'Testville',
-  State: 'TS',
-  Postcode: '12345',
-  Country: 'Testland',
+  id: 'cust1',
+  printiqCustomerId: 999,
+  name: 'Test Co.',
 };
 
 const sampleContact = {
@@ -65,8 +62,10 @@ describe('Integration Handler Sanity Checks', () => {
   });
 
   it('should process sample customer without throwing', async () => {
+    const req = { body: sampleCustomer, headers: {} };
+    const res = { status: () => ({ json: () => {} }) };
     await expect(
-      processPrintIQCustomerWebhook(sampleCustomer)
+      processPrintIQCustomerWebhook(req, res)
     ).resolves.not.toThrow();
   });
 

@@ -1,4 +1,11 @@
-import { vi } from 'vitest';
+// __mocks__/sync/auth/tokenManager.js
+async function _getAccessToken() {
+  return 'test-token';
+}
 
-export const getValidAccessToken = vi.fn();
-export const refreshAccessToken = vi.fn();
+export async function getAccessToken() {
+  return _getAccessToken();
+}
+
+const defaultExport = { getAccessToken };
+export default defaultExport;
