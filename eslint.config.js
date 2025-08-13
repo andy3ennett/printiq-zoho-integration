@@ -1,29 +1,23 @@
-import eslintPluginPrettier from 'eslint-plugin-prettier';
-import prettier from 'eslint-config-prettier';
+// eslint.config.js
+import js from '@eslint/js';
+import globals from 'globals';
 
 export default [
   {
-    files: ['**/*.js'],
+    ignores: ['node_modules/**', 'coverage/**', 'dist/**'],
+  },
+  {
     languageOptions: {
-      ecmaVersion: 'latest',
+      ecmaVersion: 2022,
       sourceType: 'module',
-    },
-    plugins: {
-      prettier: eslintPluginPrettier,
+      globals: {
+        ...globals.node,
+        // If you prefer vitest globals instead of jest, swap to globals.vitest
+        ...globals.jest,
+      },
     },
     rules: {
-      'no-unused-vars': 'warn',
-      'no-console': 'off',
-      eqeqeq: ['error', 'always'],
-      semi: ['error', 'always'],
-      quotes: ['error', 'single'],
-      'prefer-const': 'warn',
-      'no-var': 'error',
-      indent: ['error', 2],
-      'comma-dangle': ['error', 'only-multiline'],
-      'object-curly-spacing': ['error', 'always'],
-      'prettier/prettier': 'error',
+      ...js.configs.recommended.rules,
     },
   },
-  prettier,
 ];
