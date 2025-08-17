@@ -1,3 +1,6 @@
+import { vi } from 'vitest';
+/* eslint-disable no-unused-vars */
+
 export const searchAccountByExternalId = vi.fn(async (token, externalId) => {
   if (externalId === 1) return null; // Simulate not found
   if (externalId === 2) return { id: 'existing-account-id' }; // Simulate found

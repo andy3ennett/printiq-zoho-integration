@@ -141,8 +141,12 @@ main()
   .finally(async () => {
     try {
       await queue.close();
-    } catch {}
+    } catch {
+      // ignore cleanup errors
+    }
     try {
       await connection.quit();
-    } catch {}
+    } catch {
+      // ignore cleanup errors
+    }
   });

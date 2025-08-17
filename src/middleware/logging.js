@@ -5,7 +5,7 @@ import { logger, redactPII } from '../utils/logger.js';
 export const loggingMiddleware = pinoHttp({
   logger,
   genReqId: req => req.headers['x-request-id'] || uuidv4(),
-  customProps: (req, res) => ({
+  customProps: req => ({
     requestId: req.id,
   }),
   customLogLevel: (req, res, err) => {
