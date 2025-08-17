@@ -45,6 +45,7 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
    ```
 
 2. **Install dependencies**
+   The included `.npmrc` configures npm to omit optional dependencies to avoid platform-specific packages (e.g., Rollup prebuilds).
 
    ```bash
    npm ci --omit=optional
