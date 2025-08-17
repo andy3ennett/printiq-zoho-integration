@@ -21,7 +21,8 @@
     "dlq:retry": "node src/cli/dlq.js retry",
     "dlq:states": "node src/cli/dlq.js states",
     "smoke:e2e": "node scripts/smoke-e2e.js",
-    "dlq:purge": "node src/cli/dlq.js purge"
+    "dlq:purge": "node src/cli/dlq.js purge",
+    "format:check": "prettier --check ."
   },
   "keywords": [],
   "author": "",
