@@ -13,88 +13,8 @@ import { redis } from './src/services/idempotency.js';
 import { requireTokenAuth } from './sync/auth/tokenAuth.js';
 import { getValidAccessToken, tokenDoctor } from './sync/auth/tokenManager.js';
 import printiqWebhooks from './sync/routes/printiqWebhooks.js';
-import client from 'prom-client';
-import { zohoQueue } from './src/queues/zohoQueue.js';
+import { metricsMiddleware, metricsRoute } from './src/middleware/metrics.js';
 import { getCurrentUser } from './src/zoho/client.js';
-
-// Metrics setup
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
-
-const httpRequestsTotal = new client.Counter({
-  name: 'http_requests_total',
-  help: 'Total number of HTTP requests',
-  labelNames: ['method', 'route', 'status'],
-});
-const httpRequestDurationSeconds = new client.Histogram({
-  name: 'http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'route', 'status'],
-  buckets: [0.05, 0.1, 0.3, 0.5, 1, 2, 5],
-});
-register.registerMetric(httpRequestsTotal);
-register.registerMetric(httpRequestDurationSeconds);
-
-const queueWaiting = new client.Gauge({
-  name: 'bullmq_waiting',
-  help: 'Waiting jobs',
-});
-const queueActive = new client.Gauge({
-  name: 'bullmq_active',
-  help: 'Active jobs',
-});
-const queueDelayed = new client.Gauge({
-  name: 'bullmq_delayed',
-  help: 'Delayed jobs',
-});
-const queueFailed = new client.Gauge({
-  name: 'bullmq_failed',
-  help: 'Failed jobs',
-});
-const queueCompleted = new client.Gauge({
-  name: 'bullmq_completed',
-  help: 'Completed jobs',
-});
-[queueWaiting, queueActive, queueDelayed, queueFailed, queueCompleted].forEach(
-  m => register.registerMetric(m)
-);
-
-function metricsMiddleware(req, res, next) {
-  const start = process.hrtime.bigint();
-  res.on('finish', () => {
-    const dur = Number(process.hrtime.bigint() - start) / 1e9;
-    const labels = {
-      method: req.method,
-      route: req.route?.path || req.path || 'unknown',
-      status: String(res.statusCode),
-    };
-    httpRequestsTotal.inc(labels);
-    httpRequestDurationSeconds.observe(labels, dur);
-  });
-  next();
-}
-
-async function metricsHandler(_req, res) {
-  try {
-    const [w, a, d, f, c] = await Promise.all([
-      zohoQueue.getWaitingCount(),
-      zohoQueue.getActiveCount(),
-      zohoQueue.getDelayedCount(),
-      zohoQueue.getFailedCount(),
-      zohoQueue.getCompletedCount(),
-    ]);
-    queueWaiting.set(w);
-    queueActive.set(a);
-    queueDelayed.set(d);
-    queueFailed.set(f);
-    queueCompleted.set(c);
-
-    res.setHeader('Content-Type', register.contentType);
-    res.end(await register.metrics());
-  } catch (e) {
-    res.status(500).json({ error: e?.message || String(e) });
-  }
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -107,7 +27,7 @@ app.use(loggingMiddleware);
 app.use(metricsMiddleware);
 
 // Basic health and readiness endpoints
-app.get('/metrics', metricsHandler);
+metricsRoute(app);
 app.get('/healthz', (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
