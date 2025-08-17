@@ -1,47 +1,29 @@
 # .github/workflows/ci.yml
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  HUSKY: 0 # don’t run husky hooks in CI
-  TZ: Europe/London # align logs/tests with your local TZ
-  CI: true
-
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [18, 20, 22]
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Env diagnostics
-        run: |
-          node -v
-          npm -v
-          uname -a
-          printenv | sort | sed -n '1,120p'
-
-      - name: Prepare npm to avoid platform-specific optional deps
+      # Make installs deterministic and avoid platform-specific optional deps
+      - name: Configure npm for CI
         run: |
           echo "engine-strict=false" >> .npmrc
           echo "fund=false" >> .npmrc
@@ -51,22 +33,18 @@ jobs:
       - name: Install
         run: npm ci --omit=optional
 
-      - name: Format (check then fix for DX)
+      - name: Format (check then fix)
         run: npm run format:check || npm run format
 
-      - name: Lint (soft-fail for now)
-        run: npm run lint || echo "lint soft-fail (to be hardened later)"
+      - name: Lint
+        run: npm run lint
 
-      - name: Tests (with coverage)
+      - name: Test
         run: npm test -- --coverage
 
-      - name: Security audit (informational)
-        if: matrix.node == '22'
-        run: npm audit --omit=dev --audit-level=high || true
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload coverage
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: coverage-ubuntu-node${{ matrix.node }}
+          name: coverage-node-${{ matrix.node }}
           path: coverage
-          if-no-files-found: ignore
