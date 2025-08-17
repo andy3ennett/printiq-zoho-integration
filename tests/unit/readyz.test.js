@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import express from 'express';
 import { loggingMiddleware } from '../../src/middleware/logging.js';
 
