@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "checkJs": false
+  },
+  "include": [
+    "index.js",
+    "src/**/*",
+    "routes/**/*",
+    "scripts/**/*",
+    "tests/**/*",
+    "clients/**/*",
+    "utils/**/*",
+    "__mocks__/**/*"
+  ]
+}

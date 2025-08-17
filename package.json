@@ -9,8 +9,8 @@
     "dev:worker": "NODE_ENV=development node src/workers/zohoWorker.js",
     "dev:all": "concurrently -k -n api,worker -c auto \"npm:dev:api\" \"npm:dev:worker\"",
     "start": "NODE_ENV=production node index.js",
-    "lint": "node ./eslint.run.js || true",
-    "typecheck": "tsc -p . --noEmit || true",
+    "lint": "node ./eslint.run.js",
+    "typecheck": "tsc -p . --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
@@ -59,14 +59,10 @@
     "nock": "^13.5.0",
     "prettier": "^3",
     "supertest": "^7.1.4",
+    "typescript": "^5.6.3",
     "vitest": "^3"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx,json,md,yml,yaml}": "npx -y prettier@3 --write",
-    "*": {
-      "{js,ts,jsx,tsx,json,md,yml,yaml}": [
-        "prettier --write"
-      ]
-    }
+    "*.{js,ts,jsx,tsx,json,md,yml,yaml}": "npx -y prettier@3 --write"
   }
 }

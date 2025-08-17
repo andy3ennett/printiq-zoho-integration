@@ -141,8 +141,12 @@ main()
   .finally(async () => {
     try {
       await queue.close();
-    } catch {}
+    } catch {
+      // ignore errors closing the queue
+    }
     try {
       await connection.quit();
-    } catch {}
+    } catch {
+      // ignore errors closing the connection
+    }
   });

@@ -87,9 +87,13 @@ main().catch(async e => {
   console.error(e?.stack || e?.message || String(e));
   try {
     await queue?.close();
-  } catch {}
+  } catch {
+    // ignore errors closing the queue
+  }
   try {
     await connection?.quit();
-  } catch {}
+  } catch {
+    // ignore errors closing the connection
+  }
   process.exit(1);
 });
