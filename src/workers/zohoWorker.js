@@ -1,6 +1,7 @@
 import pkg from 'bullmq';
 const { Worker } = pkg;
 import { logger } from '../logger.js';
+import { observeJobDuration, startTimer } from '../middleware/metrics.js';
 import {
   searchAccountByExternalId,
   createAccount,
@@ -16,6 +17,8 @@ async function resolveAccessToken() {
 }
 
 export async function processor(job) {
+  const endTimer = startTimer();
+  let result;
   try {
     const { printiqCustomerId, name, forceFail } = job.data || {};
 
@@ -32,19 +35,19 @@ export async function processor(job) {
     if (!found) {
       const created = await createAccount(token, fields);
       const zohoId = created?.id ?? created?.data?.[0]?.details?.id;
-      return { path: 'create', zohoId };
-    }
-
-    try {
-      await updateAccount(token, found.id, fields);
-    } catch (err) {
-      if (err?.response?.status === 429) {
+      result = { path: 'create', zohoId };
+    } else {
+      try {
         await updateAccount(token, found.id, fields);
-      } else {
-        throw err;
+      } catch (err) {
+        if (err?.response?.status === 429) {
+          await updateAccount(token, found.id, fields);
+        } else {
+          throw err;
+        }
       }
+      result = { path: 'update', zohoId: found.id };
     }
-    return { path: 'update', zohoId: found.id };
   } catch (err) {
     const NonRetryable =
       globalThis.NonRetryableError ?? global.NonRetryableError ?? null;
@@ -57,7 +60,12 @@ export async function processor(job) {
       job.discard();
     }
     throw err;
+  } finally {
+    const duration = endTimer();
+    observeJobDuration(duration);
+    logger.info({ jobId: job?.id, duration }, 'worker job processed');
   }
+  return result;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
