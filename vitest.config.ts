@@ -8,5 +8,13 @@ export default defineConfig({
     restoreMocks: true,
     clearMocks: true,
     mockReset: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      thresholds: {
+        branches: 80,
+        lines: 85,
+      },
+    },
   },
 });
