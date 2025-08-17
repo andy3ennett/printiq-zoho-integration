@@ -16,14 +16,14 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 - 🔐 **Zoho OAuth 2.0** authentication and token refreshing
 - 🩺 **Health-check endpoints** for CRM connection and logging status
 - 🧪 **Integration testing CLI** to simulate live webhook events
-- ✅ Fully converted to **ES Modules (ESM)** using `Node.js v22+`
+- ✅ Fully converted to **ES Modules (ESM)** — supports **Node.js 18, 20, or 22**
 - 🧹 Linting + Pre-commit hooks via **Husky** and **lint-staged**
 
 ---
 
 ## 📦 Tech Stack
 
-- Node.js (v22+, ESM mode)
+- Node.js (v18/v20/v22, ESM mode)
 - Express.js for webhook routing
 - Zoho CRM API
 - PrintIQ Webhooks
@@ -35,6 +35,8 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 
 ## 🔧 Setup Instructions
 
+> Requires Node.js 18, 20, or 22.
+
 1. **Clone the repository**
 
    ```bash
@@ -45,7 +47,7 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 2. **Install dependencies**
 
    ```bash
-   npm install
+   npm ci --omit=optional
    ```
 
 3. **Create a `.env` file**  
@@ -68,16 +70,24 @@ This project provides a robust middleware integration between **PrintIQ** (a pri
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Tests & Lint
+
+Run the unit test suite:
 
 ```bash
-npm run test:integration
+npm test
 ```
 
-Or test individual handlers via:
+Run the linter:
 
 ```bash
-node tests/testAddressWebhook.js
+npm run lint
+```
+
+Generate a coverage report:
+
+```bash
+npm test -- --coverage
 ```
 
 ## 🔩 Zoho Configuration
@@ -97,7 +107,9 @@ node tests/testAddressWebhook.js
 - DLQ management:
   - `npm run dlq:list`
   - `npm run dlq:retry`
-- Metrics available at `http://localhost:3000/metrics`
+- Metrics available at `http://localhost:3000/metrics` when `ENABLE_METRICS=true`
+
+> Metrics are disabled unless the `ENABLE_METRICS` env var is set to `true`.
 
 ---
 
@@ -123,6 +135,18 @@ To follow.
 - Build a simple dashboard for sync history
 - Expand bidirectional sync (Zoho → PrintIQ)
 - Add audit logging and webhook versioning
+
+---
+
+## ⚠️ Gotchas
+
+- Some optional dependencies include platform-specific binaries (e.g., `@rollup/rollup-*`). If they fail to install on your system, use the recommended install command:
+
+  ```bash
+  npm ci --omit=optional
+  ```
+
+  This skips optional dependencies and matches the CI environment.
 
 ---
 
