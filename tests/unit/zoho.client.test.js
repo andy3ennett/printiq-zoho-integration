@@ -5,6 +5,7 @@ import {
   searchAccountsByExternalId,
   RetryableError,
   NonRetryableError,
+  RateLimitError,
 } from '../../src/zoho/client.js';
 
 const token = 't';
@@ -28,12 +29,34 @@ describe('zoho client', () => {
     expect(axios).toHaveBeenCalledTimes(3);
   });
 
+  it('throws RateLimitError after repeated 429s', async () => {
+    axios.mockRejectedValue({ response: { status: 429 } });
+    const p = searchAccountsByExternalId(token, '1');
+    const expectation = expect(p).rejects.toBeInstanceOf(RateLimitError);
+    await vi.runAllTimersAsync();
+    await expectation;
+    expect(axios).toHaveBeenCalledTimes(3);
+  });
+
   it('throws RetryableError after 5xx attempts', async () => {
     axios.mockRejectedValue({ response: { status: 500 } });
     const p = searchAccountsByExternalId(token, '1');
     const expectation = expect(p).rejects.toBeInstanceOf(RetryableError);
     await vi.runAllTimersAsync();
     await expectation;
+    expect(axios).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries on 500 with backoff and succeeds', async () => {
+    axios
+      .mockRejectedValueOnce({ response: { status: 500 } })
+      .mockRejectedValueOnce({ response: { status: 502 } })
+      .mockResolvedValue({ status: 200, data: { data: [] } });
+
+    const promise = searchAccountsByExternalId(token, '42');
+    await vi.runAllTimersAsync();
+    const res = await promise;
+    expect(res).toBeNull();
     expect(axios).toHaveBeenCalledTimes(3);
   });
 

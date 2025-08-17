@@ -1,4 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 import { createDealLifecycleHandler } from '../../sync/handlers/processPrintIQDealLifecycleWebhook.js';
 
 let mockDeps;
@@ -105,5 +107,50 @@ describe('processPrintIQDealLifecycleWebhook', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith({ message: 'Missing Quote ID' });
+  });
+
+  test('should return 400 for unsupported event type', async () => {
+    const req = {
+      body: { event: 'foo', quote_id: 'Q1', user: 'printIQ.Api.Integration' },
+    };
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith({
+      message: 'Unsupported event type.',
+    });
+  });
+
+  test('exposes metrics when enabled', async () => {
+    process.env.ENABLE_METRICS = 'true';
+    const { metricsMiddleware, metricsRoute } = await import(
+      '../../src/middleware/metrics.js'
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use(metricsMiddleware);
+    app.post('/webhooks/printiq/quote', handler);
+    metricsRoute(app);
+
+    mockDeps.findDealByQuoteId.mockResolvedValue({ id: 'deal777' });
+    mockDeps.updateDealStage.mockResolvedValue({ success: true });
+
+    await request(app)
+      .post('/webhooks/printiq/quote')
+      .send({
+        event: 'quote_created',
+        quote_id: 'Q777',
+        user: 'printIQ.Api.Integration',
+      })
+      .expect(200);
+
+    const metricsRes = await request(app).get('/metrics');
+    expect(metricsRes.status).toBe(200);
+    expect(metricsRes.text).toMatch(/http_requests_total/);
+
+    delete process.env.ENABLE_METRICS;
   });
 });
